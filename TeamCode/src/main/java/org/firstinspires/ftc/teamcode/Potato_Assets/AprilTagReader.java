@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Potato_Assests;
+package org.firstinspires.ftc.teamcode.Potato_Assets;
 
 import android.util.Size;
 import com.qualcomm.robotcore.hardware.HardwareMap;
