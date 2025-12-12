@@ -11,6 +11,8 @@ import java.util.List;
 /**
  * Reusable class for turning the robot to face an AprilTag using Pedro Pathing.
  * Can be used across multiple OpModes for consistent AprilTag alignment behavior.
+ *
+ * WILL HAVE TO SET MOTORS TO SPECIFC POWERING
  */
 public class TurnToFaceTag {
 
@@ -69,10 +71,7 @@ public class TurnToFaceTag {
         tagY = detection.metadata.fieldPosition.get(1);
 
         // Compute angle from robot to tag
-        angleToTag = detection.ftcPose.bearing;
-
-        // Compute smallest-rotation needed (-180 to +180)
-        turnNeeded = angleToTag - robotYaw;
+        turnNeeded = angleToTag = detection.ftcPose.bearing;
 
         // Distance to the tag (useful for debugging or future logic)
         distance = detection.ftcPose.range;
@@ -82,7 +81,8 @@ public class TurnToFaceTag {
         follower.setPose(currentPose);
 
         // Build a target pose with the same X/Y but rotated to face the tag
-        Pose targetPose = new Pose(robotX, robotY, Math.toRadians(angleToTag));
+        double targetHeadingDeg = -detection.ftcPose.bearing;
+        Pose targetPose = new Pose(robotX, robotY, Math.toRadians(targetHeadingDeg));
 
         // Build a simple Bezier-line path to rotate robot
         follower.followPath(
