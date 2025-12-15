@@ -6,6 +6,9 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.geometry.BezierLine;
+import com.rowanmcalpin.nextftc.core.units.Angle;
+import com.rowanmcalpin.nextftc.pedro.TurnTo;
+
 import java.util.List;
 
 /**
@@ -76,24 +79,10 @@ public class TurnToFaceTag {
         // Distance to the tag (useful for debugging or future logic)
         distance = detection.ftcPose.range;
 
-        // Update Pedro's internal pose to match AprilTag-derived pose
-        Pose currentPose = new Pose(robotX, robotY, Math.toRadians(robotYaw));
-        follower.setPose(currentPose);
-
         // Build a target pose with the same X/Y but rotated to face the tag
         double targetHeadingDeg = -detection.ftcPose.bearing;
-        Pose targetPose = new Pose(robotX, robotY, Math.toRadians(targetHeadingDeg));
 
-        // Build a simple Bezier-line path to rotate robot
-        follower.followPath(
-                follower.pathBuilder()
-                        .addPath(new BezierLine(follower.getPose(), targetPose.getPose()))
-                        .setLinearHeadingInterpolation(
-                                currentPose.getHeading(),
-                                targetPose.getHeading()
-                        )
-                        .build()
-        );
+        new TurnTo(Angle.fromRad(Math.toRadians(targetHeadingDeg)));
 
         isTurning = true;
 
