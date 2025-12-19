@@ -9,6 +9,7 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
+import com.bylazar.camerastream.PanelsCameraStream;
 
 /**
  * AprilTagReader - Handles AprilTag detection and camera initialization
@@ -18,6 +19,8 @@ public class AprilTagReader {
     private AprilTagProcessor aprilTag;           // AprilTag processor instance
     private VisionPortal visionPortal;            // Camera vision portal
     private final HardwareMap hardwareMap;        // Robot hardware map
+    private PanelsStreamProcessor streamProcessor; // Panels stream processor instance
+
 
     /**
      * Constructor - Initializes AprilTag detection system
@@ -25,6 +28,7 @@ public class AprilTagReader {
      */
     public AprilTagReader(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
+        streamProcessor = new PanelsStreamProcessor();
         initAprilTag();
     }
 
@@ -50,13 +54,16 @@ public class AprilTagReader {
 
         // Setup VisionPortal for camera access
         VisionPortal.Builder builder = new VisionPortal.Builder();
-        builder.setCamera(hardwareMap.get(WebcamName.class, CameraConstants.CAMERA_NAME));                   // Camera hardware
+        builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"));                   // Camera hardware
         builder.setCameraResolution(new Size(CameraConstants.CAMERA_WIDTH, CameraConstants.CAMERA_HEIGHT));  // Resolution
         builder.enableLiveView(true);                              // Enable driver station preview
         builder.setStreamFormat(VisionPortal.StreamFormat.MJPEG);  // Use MJPEG format
         builder.addProcessor(aprilTag);                            // Add AprilTag processor
-
+        builder.addProcessor(streamProcessor);
         visionPortal = builder.build();     // Build and start vision portal
+        PanelsCameraStream.INSTANCE.startStream(streamProcessor, 30);
+
+
     }
 
     // ===== Detection Access Methods =====
@@ -126,6 +133,7 @@ public class AprilTagReader {
     public void close() {
         if (visionPortal != null) {
             visionPortal.close();
+
         }
     }
 }

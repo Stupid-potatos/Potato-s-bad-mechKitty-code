@@ -43,8 +43,7 @@ public class AprilTag_Localization extends LinearOpMode {
             telemetry.update();
 
             // --- BUTTON DEBOUNCE FOR 'X' ---
-            boolean xButtonCurrentlyPressed = gamepad1.x; // ACTUALLY MEANS SQUARE FOR SOME REASON
-            if (xButtonCurrentlyPressed && !xButtonPreviouslyPressed && !turnToFaceTag.isTurning()) {
+            if (gamepad1.x && !turnToFaceTag.isTurning()) {
                 // Get current detections and attempt to turn
                 telemetry.addLine("Pressed X attempting to turn");
                 List<AprilTagDetection> detections = aprilTagReader.getFilteredDetections();
@@ -53,7 +52,7 @@ public class AprilTag_Localization extends LinearOpMode {
                 turnToFaceTag.executeTurn(detections);
 
             }
-            xButtonPreviouslyPressed = xButtonCurrentlyPressed;
+
 
             // --- TURN COMPLETION CHECK ---
             if (turnToFaceTag.update()) {

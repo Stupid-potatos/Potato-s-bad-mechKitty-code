@@ -31,8 +31,6 @@ public class CameraConstants {
     public static final int CAMERA_HEIGHT = 480;   // Image height (pixels)
 
     // Hardware configuration name (must match robot config)
-    public static final String CAMERA_NAME = "Webcam 1";
-
     // AprilTag detection settings
     public static final double DECIMATION = 0.5F;  // Lower = longer range but slower
 

@@ -4,10 +4,9 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.Pose;
-import com.pedropathing.geometry.BezierLine;
 import com.rowanmcalpin.nextftc.core.units.Angle;
 import com.rowanmcalpin.nextftc.pedro.TurnTo;
+import com.rowanmcalpin.nextftc.pedro.Turn;
 
 import java.util.List;
 
@@ -82,7 +81,10 @@ public class TurnToFaceTag {
         // Build a target pose with the same X/Y but rotated to face the tag
         double targetHeadingDeg = -detection.ftcPose.bearing;
 
-        new TurnTo(Angle.fromRad(Math.toRadians(targetHeadingDeg)));
+        //new TurnTo(Angle.fromRad(Math.toRadians(targetHeadingDeg)));
+        follower.turnTo(targetHeadingDeg);
+
+
 
         isTurning = true;
 

@@ -18,11 +18,9 @@ dependencies {
 
     implementation 'com.pedropathing:ftc:2.0.4'
     implementation 'com.pedropathing:telemetry:1.0.0'
-    implementation 'com.bylazar:fullpanels:1.0.9'
+    implementation 'com.bylazar:fullpanels:1.0.12'
 
     implementation 'com.rowanmcalpin.nextftc:core:0.6.2'
     implementation 'com.rowanmcalpin.nextftc:ftc:0.6.2'
     implementation 'com.rowanmcalpin.nextftc:pedro:0.6.2' // Remove if you don't intend to use PedroPathing
-    implementation 'com.pedropathing:pedro:2.0.4' // Remove if you don't intend to use PedroPathing
-    implementation 'com.acmerobotics.dashboard:dashboard:0.4.16' // Remove if you don't intend to use the FTC Dashboard (required if using PedroPathing)
 }
