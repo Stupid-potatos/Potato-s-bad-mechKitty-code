@@ -7,7 +7,11 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 
-@TeleOp(name = "AprilTag Data Reader")
+/**
+ * A TeleOp mode for reading AprilTag data from the camera.
+ * This Op mode is primary used for testing to see if the camera and vision logic works.
+ */
+@TeleOp(name = "AprilTag Data Reader", group= "Potato's testing")
 public class AprilTagReaderTEST extends LinearOpMode {
     private AprilTagReader aprilTagReader;
 

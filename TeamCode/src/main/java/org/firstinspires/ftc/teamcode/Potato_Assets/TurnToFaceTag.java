@@ -4,9 +4,6 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import com.pedropathing.follower.Follower;
-import com.rowanmcalpin.nextftc.core.units.Angle;
-import com.rowanmcalpin.nextftc.pedro.TurnTo;
-import com.rowanmcalpin.nextftc.pedro.Turn;
 
 import java.util.List;
 
@@ -14,7 +11,8 @@ import java.util.List;
  * Reusable class for turning the robot to face an AprilTag using Pedro Pathing.
  * Can be used across multiple OpModes for consistent AprilTag alignment behavior.
  *
- * WILL HAVE TO SET MOTORS TO SPECIFC POWERING
+ * TO DO:
+ *  - Add a class that calculates for hood movement for aimings
  */
 public class TurnToFaceTag {
 
@@ -79,7 +77,7 @@ public class TurnToFaceTag {
         distance = detection.ftcPose.range;
 
         // Build a target pose with the same X/Y but rotated to face the tag
-        double targetHeadingDeg = -detection.ftcPose.bearing;
+        double targetHeadingDeg = -detection.ftcPose.bearing ;
 
         //new TurnTo(Angle.fromRad(Math.toRadians(targetHeadingDeg)));
         follower.turnTo(targetHeadingDeg);

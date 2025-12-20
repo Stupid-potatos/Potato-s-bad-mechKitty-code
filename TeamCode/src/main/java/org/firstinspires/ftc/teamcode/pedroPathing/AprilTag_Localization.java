@@ -12,7 +12,11 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import java.util.List;
 import org.firstinspires.ftc.teamcode.Potato_Assets.TurnToFaceTag;
 
-@TeleOp(name = "AprilTag with Pedro")
+/**
+ *  A TeleOp mode for turning the robot to face an AprilTag using Pedro Pathing.
+ *  This Op mode is was used for testing to the turning logic.
+ */
+@TeleOp(name = "AprilTag with Pedro", group= "Potato's testing")
 public class AprilTag_Localization extends LinearOpMode {
 
     // AprilTag reader instance

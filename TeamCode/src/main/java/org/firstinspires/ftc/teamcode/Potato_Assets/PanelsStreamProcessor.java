@@ -13,6 +13,12 @@ import org.opencv.core.Mat;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * A class mode for streaming the camera vision feed to the Panels.
+ * This is primary used for testing to see what the camera sees.
+ *
+ * Took from an example source on a website (forgot where i got it from)
+ */
 public class PanelsStreamProcessor implements VisionProcessor, CameraStreamSource {
 
     private final AtomicReference<Bitmap> lastFrame =

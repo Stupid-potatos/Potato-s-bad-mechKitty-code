@@ -17,8 +17,8 @@ apply from: '../build.dependencies.gradle'
 
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
+    compileSdk 34
 
-    compileSdk 35
     defaultConfig {
         minSdk 24
     }
@@ -31,5 +31,6 @@ android {
 dependencies {
     implementation project(':FtcRobotController')
     implementation "com.bylazar:fullpanels:1.0.6"
+    implementation 'com.github.NoahBres:jotai:1.0.3'
 
 }
