@@ -10,6 +10,8 @@ import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 /**
  * A TeleOp mode for reading AprilTag data from the camera.
  * This Op mode is primary used for testing to see if the camera and vision logic works.
+ *
+ * @author Potato
  */
 @TeleOp(name = "AprilTag Data Reader", group= "Potato's testing")
 public class AprilTagReaderTEST extends LinearOpMode {

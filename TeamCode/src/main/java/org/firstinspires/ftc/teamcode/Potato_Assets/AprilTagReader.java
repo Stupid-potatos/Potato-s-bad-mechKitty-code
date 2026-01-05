@@ -14,9 +14,11 @@ import com.bylazar.camerastream.PanelsCameraStream;
 /**
  * AprilTagReader - Handles AprilTag detection and camera initialization
  * Provides easy access to tag detection data for navigation
+ *
+ * @author Potato
  */
 public class AprilTagReader {
-    private AprilTagProcessor aprilTag;           // AprilTag processor instance
+    private static AprilTagProcessor aprilTag;           // AprilTag processor instance
     private VisionPortal visionPortal;            // Camera vision portal
     private final HardwareMap hardwareMap;        // Robot hardware map
     private PanelsStreamProcessor streamProcessor; // Panels stream processor instance
@@ -127,7 +129,7 @@ public class AprilTagReader {
     }
 
     /**
-     * Close vision portal and release camera resources
+     * Close vision portal and release camera resourcesfor (AprilTagDetection detection : detections) {
      * Call this when done with AprilTag detection
      */
     public void close() {
@@ -135,5 +137,28 @@ public class AprilTagReader {
             visionPortal.close();
 
         }
+    }
+
+    /**
+     * Get the current AprilTag motif
+     * @return
+     */
+    public static String getMotif() {
+        List<AprilTagDetection> detections = aprilTag.getDetections();
+            for (AprilTagDetection detection : detections) {
+                if (detection.metadata != null) {
+                    if (detection.metadata.id == 21) {
+                        return ("Green, Purple, Purple");
+                    }
+                    if (detection.metadata.id == 22) {
+                        return ("Purple, Green, Purple");
+                    }
+                    if (detection.metadata.id == 23) {
+                        return ("Purple, Purple, Green");
+                    }
+
+                }
+            }
+        return null;
     }
 }

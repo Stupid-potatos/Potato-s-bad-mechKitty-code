@@ -8,17 +8,19 @@ import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 /**
  * Camera configuration constants for AprilTag detection
  * Contains values for camera setup and calibration
+ *
+ * @author Potato
  */
 public class CameraConstants {
     // Camera physical position relative to robot center (inches)
     // X = right/left, Y = forward/back, Z = up/down
-    public static final Position CAMERA_POSITION = new Position(DistanceUnit.INCH,
-            0, 0, 0, 0);
+    public static final Position CAMERA_POSITION = new Position(DistanceUnit.CM,
+            14, 29, 0, 20);
 
     // Camera orientation angles relative to robot (degrees)
     // Yaw = rotation, Pitch = up/down tilt, Roll = side tilt
     public static final YawPitchRollAngles CAMERA_ORIENTATION = new YawPitchRollAngles(AngleUnit.DEGREES,
-            0, 0, 0, 0);
+            0, 18, 0, 0);
 
     // Camera calibration/intrinsic parameters (in pixels)
     public static final double CAMERA_FX = 115.612000761;    // Focal length X

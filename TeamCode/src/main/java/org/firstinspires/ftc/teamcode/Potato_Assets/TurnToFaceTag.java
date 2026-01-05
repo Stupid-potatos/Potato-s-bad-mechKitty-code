@@ -5,6 +5,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import com.pedropathing.follower.Follower;
 
+
 import java.util.List;
 
 /**
@@ -12,7 +13,9 @@ import java.util.List;
  * Can be used across multiple OpModes for consistent AprilTag alignment behavior.
  *
  * TO DO:
- *  - Add a class that calculates for hood movement for aimings
+ *  - Add a class that calculates for hood movement for aiming
+ *
+ *  @author Potato
  */
 public class TurnToFaceTag {
 
@@ -81,8 +84,8 @@ public class TurnToFaceTag {
 
         //new TurnTo(Angle.fromRad(Math.toRadians(targetHeadingDeg)));
         follower.turnTo(targetHeadingDeg);
-
-
+        follower.getVelocity()
+;
 
         isTurning = true;
 

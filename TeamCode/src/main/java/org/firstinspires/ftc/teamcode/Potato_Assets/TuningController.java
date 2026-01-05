@@ -6,7 +6,7 @@ import com.noahbres.jotai.StateMachineBuilder;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
- * A reuseable class for aligning the robot to the April Tag, allowing for ease of aiming
+ * A reuseable class for tuing the PIDF of the flywheel motor.
  *
  * Took from Noah Bres tutorial
  */

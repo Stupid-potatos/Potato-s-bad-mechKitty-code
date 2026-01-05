@@ -9,12 +9,12 @@ import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigu
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.teamcode.Potato_Assets.TuningController;
 
 /**
  *  A TeleOp mode for tuning the PIDF on the flywheel motor using fullpanels.
- *  HEAVILY written (took and modified from Noah Bres)
+ *  HEAVILY written by Noah Bres (took and modified from Noah Bres, since his was for ftc dashboard)
  */
 @Configurable
 @TeleOp(name = "Flywheel PIDF Tuner", group = "Potato's testing")
@@ -27,6 +27,7 @@ public class FlywheelPIDFTuner extends LinearOpMode {
     public static double kF = 12.5;
 
     private VoltageSensor batteryVoltageSensor;
+    private final ElapsedTime time = new ElapsedTime();
 
     @Override
     public void runOpMode() {
