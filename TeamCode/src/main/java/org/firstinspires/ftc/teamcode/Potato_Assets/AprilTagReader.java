@@ -18,10 +18,9 @@ import com.bylazar.camerastream.PanelsCameraStream;
  * @author Potato
  */
 public class AprilTagReader {
-    private static AprilTagProcessor aprilTag;           // AprilTag processor instance
+    private AprilTagProcessor aprilTag;           // AprilTag processor instance
     private VisionPortal visionPortal;            // Camera vision portal
     private final HardwareMap hardwareMap;        // Robot hardware map
-    private PanelsStreamProcessor streamProcessor; // Panels stream processor instance
 
 
     /**
@@ -30,7 +29,6 @@ public class AprilTagReader {
      */
     public AprilTagReader(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
-        streamProcessor = new PanelsStreamProcessor();
         initAprilTag();
     }
 
@@ -61,9 +59,7 @@ public class AprilTagReader {
         builder.enableLiveView(true);                              // Enable driver station preview
         builder.setStreamFormat(VisionPortal.StreamFormat.MJPEG);  // Use MJPEG format
         builder.addProcessor(aprilTag);                            // Add AprilTag processor
-        builder.addProcessor(streamProcessor);
         visionPortal = builder.build();     // Build and start vision portal
-        PanelsCameraStream.INSTANCE.startStream(streamProcessor, 30);
 
 
     }
@@ -143,20 +139,13 @@ public class AprilTagReader {
      * Get the current AprilTag motif
      * @return
      */
-    public static String getMotif() {
+    public String getMotif() {
         List<AprilTagDetection> detections = aprilTag.getDetections();
             for (AprilTagDetection detection : detections) {
-                if (detection.metadata != null) {
-                    if (detection.metadata.id == 21) {
-                        return ("Green, Purple, Purple");
-                    }
-                    if (detection.metadata.id == 22) {
-                        return ("Purple, Green, Purple");
-                    }
-                    if (detection.metadata.id == 23) {
-                        return ("Purple, Purple, Green");
-                    }
-
+                switch (detection.id) {
+                    case 21: return "Green, Purple, Purple";
+                    case 22: return "Purple, Green, Purple";
+                    case 23: return "Purple, Purple, Green";
                 }
             }
         return null;

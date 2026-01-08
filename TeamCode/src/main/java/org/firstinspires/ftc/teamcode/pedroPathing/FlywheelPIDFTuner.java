@@ -32,7 +32,7 @@ public class FlywheelPIDFTuner extends LinearOpMode {
     @Override
     public void runOpMode() {
         // Get motor from hardware map
-        DcMotorEx myMotor = hardwareMap.get(DcMotorEx.class, "flywheelMotor1");
+        DcMotorEx myMotor = hardwareMap.get(DcMotorEx.class, "flywheel");
         // myMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Enable bulk caching for better performance
