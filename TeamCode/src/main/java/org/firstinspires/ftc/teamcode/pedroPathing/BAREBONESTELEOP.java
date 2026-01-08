@@ -33,7 +33,6 @@ import java.util.List;
  * - Square: Toggle outtake
  * - Circle: Scan AprilTag
  * - Left Bumper: Reload/flick
- * - Right Bumper: Turn to face AprilTag
  *
  * @author Potato
  */
@@ -62,7 +61,7 @@ public class BAREBONESTELEOP extends OpMode {
     private Servo flicker;  // Servo that flicks rings into the flywheel
     private Servo hood;     // Servo for adjusting shooting angle (not currently used)
     private double servoPos = 0.5;
-
+    private final double ServoIncrement = 0.05;
     // ============================================================================
     // SERVO POSITIONS
     // ============================================================================
@@ -254,7 +253,7 @@ public class BAREBONESTELEOP extends OpMode {
         }
 
         if (gamepad1.dpad_right && !prevDpadRight) {
-            servoPos += 0.01;
+            servoPos += ServoIncrement;
             servoPos = Math.max(0.0, Math.min(1.0, servoPos));
             hood.setPosition(servoPos);
         }
