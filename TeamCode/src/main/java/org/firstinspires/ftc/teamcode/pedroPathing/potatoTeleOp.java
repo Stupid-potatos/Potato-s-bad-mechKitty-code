@@ -8,10 +8,12 @@ import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.hardware.lynx.LynxModule;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -43,7 +45,7 @@ import java.util.List;
  * @author Potato
  */
 @TeleOp(name="PotatoTeleOp", group = "Potato's testing")
-public class TeleOpTest extends OpMode {
+public class potatoTeleOp extends OpMode {
     // ============================================================================
     // PEDRO PATHING & TELEMETRY
     // ============================================================================
@@ -109,8 +111,8 @@ public class TeleOpTest extends OpMode {
     // ============================================================================
     private final double kP = 5.0;
     private final double kI = 0.1;
-    private final double kD = 0.0;
-    private final double kF = 0.0;
+    private final double kD = 0.2;
+    private final double kF = 12.0;
     private final double shootingSpeed = 1.0;  // Target flywheel speed
     // ============================================================================
     // April Tag and Turning to Face the April Tag initialization
@@ -135,10 +137,11 @@ public class TeleOpTest extends OpMode {
         flicker = hardwareMap.get(Servo.class, "flicker");
         hood = hardwareMap.get(Servo.class, "hood");
         flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
-        Intake = hardwareMap.get(DcMotorEx.class, "Intake");
+        Intake = hardwareMap.get(DcMotorEx.class, "intake");
 
         // Initialize the Panels field visualization
         field = PanelsField.INSTANCE.getField();
+
 
         // Enable bulk reading for better performance
         // This reads all sensor data at once instead of individually
@@ -170,7 +173,10 @@ public class TeleOpTest extends OpMode {
         telemetryM.update();
 
         aprilTagReader = new AprilTagReader(hardwareMap);  // Start AprilTag detection
-        turnToFaceTag = new TurnToFaceTag(follower, telemetry); // Initialize turn utility
+        //turnToFaceTag = new TurnToFaceTag(follower, telemetry); // Initialize turn utility
+
+        follower.setPose(new Pose(0, 0, 0)); // x, y, heading (radians)
+
     }
 
     /**
@@ -186,9 +192,11 @@ public class TeleOpTest extends OpMode {
         double strafe = gamepad1.left_stick_x;   // Left/right strafing
         double turn = gamepad1.right_stick_x;    // Rotation
 
-        // Send drive commands to the follower and update robot position
-        follower.setTeleOpDrive(drive, strafe, turn);
-        follower.update();
+        Pose pose = follower.getPose();
+        if (pose != null) {
+            follower.setTeleOpDrive(drive, strafe, turn);
+            follower.update();
+        }
 
         // === BUTTON DETECTION (Edge Detection for Toggles) ===
         // Edge detection: only trigger when button goes from not pressed to pressed
@@ -210,6 +218,7 @@ public class TeleOpTest extends OpMode {
         // Press X button to turn intake on/off
         if (intakeButtonPressed) {
             intakeIsOn = !intakeIsOn;  // Flip the state
+
             Intake.setPower(intakeIsOn ? 0.3 : 0.0);  // Turn motor on (0.3) or off (0.0)
         }
 
@@ -223,17 +232,12 @@ public class TeleOpTest extends OpMode {
 
         // === OUTTAKE TOGGLE ===
         // Press Square button to turn outtake on/off
-        if (outtakeButtonPressed) {
-            outtakeIsOn = !outtakeIsOn;  // Flip the state
-            if (outtakeIsOn) {
-                intakeIsOn = false;  // Turn off intake when outtaking
-                Intake.setDirection(DcMotor.Direction.REVERSE);
-                Intake.setPower(0.3);
-            } else {
-                Intake.setDirection(DcMotor.Direction.FORWARD);
-                Intake.setPower(0.0);
-            }
-        }
+        //if (outtakeButtonPressed) {
+        //    outtakeIsOn = !outtakeIsOn;  // Flip the state
+        //    if (outtakeIsOn) {
+        //        intakeIsOn = false;  // Turn off intake when outtaking
+        //        Intake.setPower(-0.3);
+        //}
 
         // === RELOAD/FLICKER ===
         // Press left bumper to flick a ring
@@ -262,10 +266,12 @@ public class TeleOpTest extends OpMode {
             }
         }
 
-        if (gamepad1.right_bumper) {
-            List<AprilTagDetection> detections = aprilTagReader.getFilteredDetections();
-            turnToFaceTag.executeTurn(detections);
-        }
+        //if (gamepad1.right_bumper) {
+        //    List<AprilTagDetection> detections = aprilTagReader.getFilteredDetections();
+        //    turnToFaceTag.executeTurn(detections);
+        //}
+
+        if (pose == null) return;
 
         if (gamepad1.dpadRightWasPressed()) {
             servoPos += 0.01;
@@ -281,9 +287,9 @@ public class TeleOpTest extends OpMode {
 
         // === TELEMETRY - Position data ===
         telemetryM.addLine("=== Position ===");
-        telemetryM.addLine("X: " + String.format("%.2f", follower.getPose().getX()));
-        telemetryM.addLine("Y: " + String.format("%.2f", follower.getPose().getY()));
-        telemetryM.addLine("Heading: " + String.format("%.2f°", Math.toDegrees(follower.getPose().getHeading())));
+        telemetryM.addLine("X: " + String.format("%.2f", pose.getX()));
+        telemetryM.addLine("Y: " + String.format("%.2f", pose.getY()));
+        //telemetryM.addLine("Heading: " + String.format("%.2f°", Math.toDegrees(follower.getPose().getHeading())));
         telemetryM.addLine("BATTERY: " + String.format("%.2fV", batteryVoltageSensor.getVoltage()));
 
         // === TELEMETRY - Mechanism status ===
@@ -299,7 +305,6 @@ public class TeleOpTest extends OpMode {
 
         // === PANELS FIELD VISUALIZATION ===
         // Get current robot pose (position and heading)
-        Pose pose = follower.getPose();
 
         // Update the cursor position on the Panels field view
         // This shows where the robot is on the virtual field
@@ -313,9 +318,20 @@ public class TeleOpTest extends OpMode {
      */
     @Override
     public void stop() {
-        // Stop all mechanisms when OpMode ends
-        if (flywheel != null) {flywheel.setPower(0);}
-        if (Intake != null) Intake.setPower(0);
-        if (aprilTagReader != null) aprilTagReader.close();
+        try {
+            // Stop all mechanisms when OpMode ends
+            if (flywheel != null) {
+                flywheel.setPower(0);
+            }
+            if (Intake != null) Intake.setPower(0);
+
+            if (follower != null) {
+                follower.breakFollowing();
+            }
+
+        }
+        catch (Exception e) {
+
+        }
     }
 }

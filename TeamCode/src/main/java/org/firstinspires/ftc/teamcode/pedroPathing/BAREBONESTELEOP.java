@@ -5,16 +5,21 @@ import android.annotation.SuppressLint;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
+import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Constants;
 import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 
@@ -38,6 +43,9 @@ import java.util.List;
  */
 @TeleOp(name="BAREBONE_TELEOP", group = "Potato's testing")
 public class BAREBONESTELEOP extends OpMode {
+    private final Constants robot = new Constants();
+
+
     // ============================================================================
     // PEDRO PATHING & TELEMETRY
     // ============================================================================
@@ -53,6 +61,7 @@ public class BAREBONESTELEOP extends OpMode {
     // MOTORS
     // ============================================================================
     private DcMotorEx flywheel;  // Motor that spins to shoot rings
+    private DcMotorEx flywheel1;
     private DcMotorEx intake;    // Motor for intake mechanism
 
     // ============================================================================
@@ -66,7 +75,7 @@ public class BAREBONESTELEOP extends OpMode {
     // SERVO POSITIONS
     // ============================================================================
     private final double flickerDefaultPos = 0.13;  // Resting position of flicker
-    private final double flickerMaxPos = 0.43;      // Extended position when flicking
+    private final double flickerMaxPos = 1.0;      // Extended position when flicking
 
     // ============================================================================
     // MECHANISM STATE FLAGS
@@ -106,7 +115,7 @@ public class BAREBONESTELEOP extends OpMode {
     private final double kI = 0.1;
     private final double kD = 0.0;
     private final double kF = 0.0;
-    private final double shootingSpeed = 3000;  // Target flywheel speed
+    private final double shootingSpeed = 5000;  // Target flywheel speed
     // ============================================================================
     // April Tag and Turning to Face the April Tag initialization
     // ============================================================================
@@ -118,7 +127,8 @@ public class BAREBONESTELEOP extends OpMode {
      * Sets up all hardware and prepares robot for operation
      */
     @Override
-    public void init() {
+    public void  init() {
+
         // Initialize Panels telemetry for dashboard display
         telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
 
@@ -129,6 +139,7 @@ public class BAREBONESTELEOP extends OpMode {
         flicker = hardwareMap.get(Servo.class, "flicker");
         hood = hardwareMap.get(Servo.class, "hood");
         flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
+        flywheel1 = hardwareMap.get(DcMotorEx.class, "flywheel1");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
 
         intake.setDirection(DcMotor.Direction.FORWARD);
@@ -145,13 +156,16 @@ public class BAREBONESTELEOP extends OpMode {
         motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
         flywheel.setMotorType(motorConfigurationType);
 
+        MotorConfigurationType motorConfigurationType1 = flywheel1.getMotorType().clone();
+        motorConfigurationType1.setAchieveableMaxRPMFraction(1.0);
+        flywheel1.setMotorType(motorConfigurationType);
         // Enable encoder-based velocity control for precise flywheel speed
-        flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        flywheel1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // Set PIDF coefficients for flywheel velocity control
         // This helps maintain consistent shooting speed
         flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(kP, kI, kD, kF));
-
+        flywheel1.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(kP, kI, kD, kF));
         // Get battery voltage sensor for monitoring power
         batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
@@ -164,8 +178,16 @@ public class BAREBONESTELEOP extends OpMode {
 
         aprilTagReader = new AprilTagReader(hardwareMap);  // Start AprilTag detection
 
+        Pose startingPose = new Pose(0,0,0);
+        follower.setStartingPose(startingPose == null ? new Pose() : startingPose);
     }
-
+    @Override
+    public void start() {
+        //The parameter controls whether the Follower should use break mode on the motors (using it is recommended).
+        //In order to use float mode, add .useBrakeModeInTeleOp(true); to your Drivetrain Constants in Constant.java (for Mecanum)
+        //If you don't pass anything in, it uses the default (false)
+        follower.startTeleopDrive();
+    }
     /**
      * Loop method - runs repeatedly while OpMode is active
      * Handles all robot control and telemetry updates
@@ -175,26 +197,30 @@ public class BAREBONESTELEOP extends OpMode {
     public void loop() {
         // === DRIVING CONTROL ===
         // Read gamepad joystick values for robot movement
-        double drive = -gamepad1.left_stick_y;  // Forward/backward (inverted because Y is reversed)
+        double drive = gamepad1.left_stick_y;  // Forward/backward
         double strafe = gamepad1.left_stick_x;   // Left/right strafing
         double turn = gamepad1.right_stick_x;    // Rotation
-
-        // Send drive commands to the follower and update robot position
-        follower.setTeleOpDrive(drive, strafe, turn);
-        follower.update();
-
+        if (follower != null) {
+            // Send drive commands to the follower and update robot position
+            follower.setTeleOpDrive(drive, strafe, turn);
+            follower.update();
+        }
+        else {follower.setStartingPose(new Pose(0, 0, 0));}
         // === BUTTON DETECTION (Edge Detection for Toggles) ===
         // Edge detection: only trigger when button goes from not pressed to pressed
         // This prevents holding a button from toggling the mechanism repeatedly
-        boolean shootButtonPressed = gamepad1.a && !prevShootButton;
-        boolean intakeButtonPressed = gamepad1.x && !prevIntakeButton;
-        boolean outtakeButtonPressed = gamepad1.square && !prevOuttakeButton;
+        boolean shootButtonPressed = gamepad1.yWasPressed();
+        boolean intakeButtonPressed = gamepad1.aWasPressed();
+        //boolean outtakeButtonPressed = gamepad1.square && !prevOuttakeButton;
         boolean aprilTagButtonPressed = gamepad1.circle && !prevAprilTagButton;
         boolean reloadButtonPressed = gamepad1.left_bumper && !prevReloadButton;
+        boolean hoodUP = gamepad1.dpad_right;
+        boolean hoodDown = gamepad1.dpad_left;
+
 
         // Update previous button states for next loop iteration
-        prevShootButton = gamepad1.a;
-        prevIntakeButton = gamepad1.x;
+        //prevShootButton = gamepad1.a;
+        //prevIntakeButton = gamepad1.xWasPressed();
         prevOuttakeButton = gamepad1.square;
         prevAprilTagButton = gamepad1.circle;
         prevReloadButton = gamepad1.left_bumper;
@@ -202,28 +228,26 @@ public class BAREBONESTELEOP extends OpMode {
         // === INTAKE TOGGLE ===
         // Press X button to turn intake on/off
         if (intakeButtonPressed) {
+            intakeIsOn = !intakeIsOn;
             outtakeIsOn = false;
-            intakeIsOn = !intakeIsOn;  // Flip the state
-            intake.setDirection(DcMotor.Direction.FORWARD);
-            intake.setPower(intakeIsOn ? 0.3 : 0.0);  // Turn motor on (0.3) or off (0.0)
-        }
+            intake.setPower(intakeIsOn ? -1 : 0);
+            }
 
         // === SHOOTING TOGGLE ===
         // Press A button to turn shooting on/off
         if (shootButtonPressed) {
-
             shootingIsOn = !shootingIsOn;  // Flip the state
             flywheel.setVelocity(shootingIsOn ? shootingSpeed : 0);
+            flywheel1.setVelocity(shootingIsOn ? shootingSpeed : 0);
         }
 
         // === OUTTAKE TOGGLE ===
         // Press Square button to turn outtake on/off
-        if (outtakeButtonPressed) {
-            outtakeIsOn = !outtakeIsOn;
-            intakeIsOn = false;
-            intake.setDirection(DcMotor.Direction.REVERSE);
-            intake.setPower(outtakeIsOn ? 0.3 : 0.0);
-        }
+        //if (outtakeButtonPressed) {
+        //    outtakeIsOn = !outtakeIsOn;
+        //    intakeIsOn = false;
+        //    intake.setPower(outtakeIsOn ? -0.5 : 0);
+        //}
 
         // === RELOAD/FLICKER ===
         // Press left bumper to flick a ring
@@ -252,18 +276,19 @@ public class BAREBONESTELEOP extends OpMode {
             }
         }
 
-        if (gamepad1.dpad_right && !prevDpadRight) {
+        if (hoodUP) {
             servoPos += ServoIncrement;
             servoPos = Math.max(0.0, Math.min(1.0, servoPos));
             hood.setPosition(servoPos);
         }
         prevDpadRight = gamepad1.dpad_right;
-        if (gamepad1.dpad_left && !prevDpadLeft) {
-            servoPos -= 0.01;
+        if (hoodDown) {
+            servoPos -= ServoIncrement;
             servoPos = Math.max(0.0, Math.min(1.0, servoPos));
             hood.setPosition(servoPos);
         }
-        prevDpadLeft = gamepad1.dpad_left;
+
+
 
         // === TELEMETRY - Position data ===
         telemetryM.addLine("=== Position ===");
@@ -279,6 +304,8 @@ public class BAREBONESTELEOP extends OpMode {
         telemetryM.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
         telemetryM.addLine("Hood: " + (servoPos));
 
+        telemetry.addLine("Shooting: " + ((flywheel.getVelocity(AngleUnit.DEGREES)/28)*60));
+        telemetry.addLine("Hood: " + (servoPos)); // NEED TUNING
         // Update telemetry display
         telemetryM.update();
 
@@ -291,7 +318,10 @@ public class BAREBONESTELEOP extends OpMode {
     @Override
     public void stop() {
         // Stop all mechanisms when OpMode ends
-        if (flywheel != null) flywheel.setPower(0);
+        if (flywheel != null) {
+            flywheel.setPower(0);
+            flywheel1.setPower(0);
+        }
         if (intake != null) intake.setPower(0);
         if (flicker != null) flicker.setPosition(flickerDefaultPos);
         if (follower != null) {
