@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode;
 
 import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
 
+import androidx.annotation.NonNull;
+
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.ftc.FollowerBuilder;
@@ -9,19 +11,41 @@ import com.pedropathing.ftc.drivetrains.MecanumConstants;
 import com.pedropathing.ftc.localization.constants.PinpointConstants;
 import com.pedropathing.ftc.localization.constants.TwoWheelConstants;
 import com.pedropathing.ftc.localization.localizers.TwoWheelLocalizer;
+import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathConstraints;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 public class Constants {
+    public DcMotor frontLeft, frontRight, backLeft, backRight, intake;
+    public DcMotorEx flywheel, flywheel2;
+    public Servo hood, flicker;
+    GoBildaPinpointDriver pinpoint;
+    //create static variables to represent the config strings
+    private static final String FRONT_LEFT = "frontLeft";
+    private static final String FRONT_RIGHT = "frontRight";         //change these for config file
+    private static final String BACK_LEFT = "backLeft";
+    private static final String BACK_RIGHT = "backRight";
+    private static final String INTAKE = "intake";
+    private static final String FLYWHEEL = "flywheel";
+    private static final String FLYWHEEL2 = "flywheel2";
+    private static final String HOOD = "hood";
+    private static final String FLICKER = "flicker";
+    private static final String PINPOINT = "pinpoint";
+    Pose2D startingPose = new Pose2D(DistanceUnit. INCH, 0, 0, AngleUnit. DEGREES, 0);
+    Pose f_startingPose = new Pose(0, 0, Math.toRadians(0));
+
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(12.5);
     //.forwardZeroPowerAcceleration() put in value from forward zero power acceleration tuner
