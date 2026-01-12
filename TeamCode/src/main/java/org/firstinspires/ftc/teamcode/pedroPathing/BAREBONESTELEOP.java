@@ -18,8 +18,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.teamcode.Constants;
 import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 
-import java.util.List;
-
 /**
  * TeleOp mode with shooting, intake, and outtake mechanisms
  * Uses toggle buttons for mechanism control
@@ -33,60 +31,73 @@ import java.util.List;
  * - Square: Toggle outtake
  * - Circle: Scan AprilTag
  * - Left Bumper: Reload/flick
+ * - D-pad Right: Increase hood position
+ * - D-pad Left: Decrease hood position
  *
  * @author Potato
  */
-@TeleOp(name="BAREBONE_TELEOP", group = "Potato's testing")
+@TeleOp(name = "BAREBONE_TELEOP", group = "Potato's testing")
 public class BAREBONESTELEOP extends OpMode {
-    // ============================================================================
-    // PEDRO PATHING & TELEMETRY
-    // ============================================================================
-    private Follower follower;              // Pedro Pathing follower for advanced movement control
-    private TelemetryManager telemetryM;    // Panels telemetry manager for displaying data on dashboard
 
-    // ============================================================================
-    // SENSORS
-    // ============================================================================
-    private VoltageSensor batteryVoltageSensor;  // Battery voltage sensor for monitoring power levels
+    // ========================================
+    // CONSTANTS
+    // ========================================
 
-    // ============================================================================
-    // MOTORS
-    // ============================================================================
-    private DcMotorEx flywheel;  // Motor that spins to shoot rings
-    private DcMotorEx intake;    // Motor for intake mechanism
+    // Servo positions
+    private static final double FLICKER_DEFAULT_POS = 0.13;
+    private static final double FLICKER_MAX_POS = 0.45;
+    private static final double SERVO_INCREMENT = 0.02;
+    private static final double HOOD_STARTING_POSITION = 0.00; // TEMP VALUE
 
-    // ============================================================================
-    // SERVOS
-    // ============================================================================
-    private Servo flicker;  // Servo that flicks rings into the flywheel
-    private Servo hood;     // Servo for adjusting shooting angle (not currently used)
-    private double servoPos = 0.5;
-    private final double ServoIncrement = 0.05;
-    // ============================================================================
-    // SERVO POSITIONS
-    // ============================================================================
-    private final double flickerDefaultPos = 0.13;  // Resting position of flicker
-    private final double flickerMaxPos = 0.43;      // Extended position when flicking
+    // Motor settings
+    private static final double INTAKE_POWER = 0.3;
+    private static final double SHOOTING_SPEED = 3000;
+    private static final double SHOOTING_DELAY_SECONDS = 0.3;
 
-    // ============================================================================
-    // MECHANISM STATE FLAGS
-    // ============================================================================
+    // PIDF coefficients TEMP
+    private static final double kP = 5.0;
+    private static final double kI = 0.1;
+    private static final double kD = 0.0;
+    private static final double kF = 0.0;
+
+    // ========================================
+    // HARDWARE COMPONENTS
+    // ========================================
+
+    // Pedro Pathing & Telemetry
+    private Follower follower;
+    private TelemetryManager telemetryM;
+
+    // Sensors
+    private VoltageSensor batteryVoltageSensor;
+    private AprilTagReader aprilTagReader;
+
+    // Motors
+    private DcMotorEx flywheel;
+    private DcMotorEx flywheel1;
+    private DcMotorEx intake;
+
+    // Servos
+    private Servo flicker;
+    private Servo hood;
+
+    // ========================================
+    // STATE VARIABLES
+    // ========================================
+
+    // Mechanism states
     private boolean shootingIsOn = false;
     private boolean intakeIsOn = false;
     private boolean outtakeIsOn = false;
 
-    // ============================================================================
-    // FLICKER TIMING & RELOAD
-    // ============================================================================
-    private ElapsedTime flickerTimer = new ElapsedTime();  // Timer to track flicker movement
-    private boolean flickerReloading = false;               // Flag to track if flicker is currently moving
-    private final double shootingDelaySeconds = 0.3;        // Time (in seconds) flicker stays extended
+    // Flicker control
+    private ElapsedTime flickerTimer = new ElapsedTime();
+    private boolean flickerReloading = false;
 
-    // ============================================================================
-    // BUTTON EDGE DETECTION
-    // Previous button states prevent holding a button from toggling repeatedly
-    // Edge detection = only trigger on the moment button is pressed, not while held
-    // ============================================================================
+    // Hood position
+    private double servoPos = 0.5;
+
+    // Button edge detection
     private boolean prevShootButton = false;
     private boolean prevIntakeButton = false;
     private boolean prevOuttakeButton = false;
@@ -95,209 +106,278 @@ public class BAREBONESTELEOP extends OpMode {
     private boolean prevDpadRight = false;
     private boolean prevDpadLeft = false;
 
-    // ============================================================================
-    // FLYWHEEL PIDF CONTROL
-    // P = Proportional gain (responds to current error)
-    // I = Integral gain (responds to accumulated error over time)
-    // D = Derivative gain (responds to rate of change of error)
-    // F = Feedforward gain (predicts power needed based on target velocity)
-    // ============================================================================
-    private final double kP = 5.0;
-    private final double kI = 0.1;
-    private final double kD = 0.0;
-    private final double kF = 0.0;
-    private final double shootingSpeed = 3000;  // Target flywheel speed
-    // ============================================================================
-    // April Tag and Turning to Face the April Tag initialization
-    // ============================================================================
-    private AprilTagReader aprilTagReader;
+    // ========================================
+    // INITIALIZATION
+    // ========================================
 
-
-    /**
-     * Initialization method - runs once when you press INIT on driver station
-     * Sets up all hardware and prepares robot for operation
-     */
     @Override
     public void init() {
-        // Initialize Panels telemetry for dashboard display
+        initializeTelemetry();
+        initializeHardware();
+        configureBulkReading();
+        configureFlywheelMotor();
+        configurePIDFCoefficients();
+        initializeSensors();
+        setInitialPositions();
+
+        telemetryM.addLine("Robot initialized - Ready to go!");
+        telemetryM.update();
+    }
+
+    private void initializeTelemetry() {
         telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
-
-        // Create Pedro Pathing follower for advanced movement
         follower = Constants.createFollower(hardwareMap);
+    }
 
-        // Get hardware from the hardware map (configured in Robot Configuration)
+    private void initializeHardware() {
         flicker = hardwareMap.get(Servo.class, "flicker");
         hood = hardwareMap.get(Servo.class, "hood");
         flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
+        flywheel1 = hardwareMap.get(DcMotorEx.class, "flywheel1");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
 
         intake.setDirection(DcMotor.Direction.FORWARD);
+    }
 
-        // Enable bulk reading for better performance
-        // This reads all sensor data at once instead of individually
+    private void configureBulkReading() {
         for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
             module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
         }
 
-        // Remove the default 85% speed limit on the flywheel motor
-        // This allows the motor to run at full power
+    }
+
+    private void configureFlywheelMotor() {
         MotorConfigurationType motorConfigurationType = flywheel.getMotorType().clone();
         motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
         flywheel.setMotorType(motorConfigurationType);
-
-        // Enable encoder-based velocity control for precise flywheel speed
         flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        // Set PIDF coefficients for flywheel velocity control
-        // This helps maintain consistent shooting speed
-        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(kP, kI, kD, kF));
-
-        // Get battery voltage sensor for monitoring power
-        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
-
-        // Set flicker servo to starting position (ready to shoot)
-        flicker.setPosition(flickerDefaultPos);
-
-        // Display initialization message
-        telemetryM.addLine("Robot initialized - Ready to go!");
-        telemetryM.update();
-
-        aprilTagReader = new AprilTagReader(hardwareMap);  // Start AprilTag detection
-
+        MotorConfigurationType motorConfigurationType1 = flywheel1.getMotorType().clone();
+        motorConfigurationType1.setAchieveableMaxRPMFraction(1.0);
+        flywheel1.setMotorType(motorConfigurationType1);
+        flywheel1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
-    /**
-     * Loop method - runs repeatedly while OpMode is active
-     * Handles all robot control and telemetry updates
-     */
+    private void configurePIDFCoefficients() {
+        flywheel.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(kP, kI, kD, kF)
+        );
+        flywheel1.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(kP, kI, kD, kF)
+        );
+    }
+
+    private void initializeSensors() {
+        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
+        aprilTagReader = new AprilTagReader(hardwareMap);
+    }
+
+    private void setInitialPositions() {
+        flicker.setPosition(FLICKER_DEFAULT_POS);
+        hood.setPosition(HOOD_STARTING_POSITION);
+    }
+
+    // ========================================
+    // MAIN LOOP
+    // ========================================
+
     @SuppressLint("DefaultLocale")
     @Override
     public void loop() {
-        // === DRIVING CONTROL ===
-        // Read gamepad joystick values for robot movement
-        double drive = -gamepad1.left_stick_y;  // Forward/backward (inverted because Y is reversed)
-        double strafe = gamepad1.left_stick_x;   // Left/right strafing
-        double turn = gamepad1.right_stick_x;    // Rotation
+        updateDriving();
+        updateButtonStates();
+        handleMechanismToggles();
+        handleFlickerReload();
+        handleAprilTagScan();
+        handleHoodAdjustment();
+        updateTelemetry();
+    }
 
-        // Send drive commands to the follower and update robot position
+    // ========================================
+    // DRIVING CONTROL
+    // ========================================
+
+    private void updateDriving() {
+        double drive = -gamepad1.left_stick_y;
+        double strafe = gamepad1.left_stick_x;
+        double turn = gamepad1.right_stick_x;
+
         follower.setTeleOpDrive(drive, strafe, turn);
         follower.update();
+    }
 
-        // === BUTTON DETECTION (Edge Detection for Toggles) ===
-        // Edge detection: only trigger when button goes from not pressed to pressed
-        // This prevents holding a button from toggling the mechanism repeatedly
-        boolean shootButtonPressed = gamepad1.a && !prevShootButton;
-        boolean intakeButtonPressed = gamepad1.x && !prevIntakeButton;
-        boolean outtakeButtonPressed = gamepad1.square && !prevOuttakeButton;
-        boolean aprilTagButtonPressed = gamepad1.circle && !prevAprilTagButton;
-        boolean reloadButtonPressed = gamepad1.left_bumper && !prevReloadButton;
+    // ========================================
+    // BUTTON MANAGEMENT
+    // ========================================
 
-        // Update previous button states for next loop iteration
+    private void updateButtonStates() {
         prevShootButton = gamepad1.a;
         prevIntakeButton = gamepad1.x;
         prevOuttakeButton = gamepad1.square;
         prevAprilTagButton = gamepad1.circle;
         prevReloadButton = gamepad1.left_bumper;
+        prevDpadRight = gamepad1.dpad_right;
+        prevDpadLeft = gamepad1.dpad_left;
+    }
 
-        // === INTAKE TOGGLE ===
-        // Press X button to turn intake on/off
-        if (intakeButtonPressed) {
+    private boolean isButtonPressed(boolean current, boolean previous) {
+        return current && !previous;
+    }
+
+    // ========================================
+    // MECHANISM CONTROL
+    // ========================================
+
+    private void handleMechanismToggles() {
+        handleShootingToggle();
+        handleIntakeToggle();
+        handleOuttakeToggle();
+    }
+
+    private void handleShootingToggle() {
+        if (isButtonPressed(gamepad1.a, prevShootButton)) {
+            shootingIsOn = !shootingIsOn;
+            flywheel.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
+
+        }
+    }
+
+    private void handleIntakeToggle() {
+        if (isButtonPressed(gamepad1.x, prevIntakeButton)) {
             outtakeIsOn = false;
-            intakeIsOn = !intakeIsOn;  // Flip the state
+            intakeIsOn = !intakeIsOn;
             intake.setDirection(DcMotor.Direction.FORWARD);
-            intake.setPower(intakeIsOn ? 0.3 : 0.0);  // Turn motor on (0.3) or off (0.0)
+            intake.setPower(intakeIsOn ? INTAKE_POWER : 0.0);
         }
+    }
 
-        // === SHOOTING TOGGLE ===
-        // Press A button to turn shooting on/off
-        if (shootButtonPressed) {
-
-            shootingIsOn = !shootingIsOn;  // Flip the state
-            flywheel.setVelocity(shootingIsOn ? shootingSpeed : 0);
-        }
-
-        // === OUTTAKE TOGGLE ===
-        // Press Square button to turn outtake on/off
-        if (outtakeButtonPressed) {
+    private void handleOuttakeToggle() {
+        if (isButtonPressed(gamepad1.square, prevOuttakeButton)) {
             outtakeIsOn = !outtakeIsOn;
             intakeIsOn = false;
             intake.setDirection(DcMotor.Direction.REVERSE);
-            intake.setPower(outtakeIsOn ? 0.3 : 0.0);
+            intake.setPower(outtakeIsOn ? INTAKE_POWER : 0.0);
+        }
+    }
+
+    // ========================================
+    // FLICKER CONTROL
+    // ========================================
+
+    private void handleFlickerReload() {
+        if (isButtonPressed(gamepad1.left_bumper, prevReloadButton) && !flickerReloading) {
+            startFlickerSequence();
         }
 
-        // === RELOAD/FLICKER ===
-        // Press left bumper to flick a ring
-        if (reloadButtonPressed && !flickerReloading) {
-            // Start the flicker sequence
-            flicker.setPosition(flickerMaxPos);  // Move flicker forward
-            flickerTimer.reset();                 // Start timing the movement
-            flickerReloading = true;              // Mark that we're in reload sequence
+        if (flickerReloading && flickerTimer.seconds() >= SHOOTING_DELAY_SECONDS) {
+            endFlickerSequence();
         }
+    }
 
-        // Check if flicker needs to return to default position
-        // After the delay time has passed, retract the flicker
-        if (flickerReloading && flickerTimer.seconds() >= shootingDelaySeconds) {
-            flicker.setPosition(flickerDefaultPos);  // Move flicker back to starting position
-            flickerReloading = false;                 // Mark reload sequence as complete
-        }
+    private void startFlickerSequence() {
+        flicker.setPosition(FLICKER_MAX_POS);
+        flickerTimer.reset();
+        flickerReloading = true;
+    }
 
-        // === APRILTAG SCAN ===
-        // Press Circle button to check for AprilTag detection
-        if (aprilTagButtonPressed) {
-            // Check if AprilTag reader detected a motif (pattern)
+    private void endFlickerSequence() {
+        flicker.setPosition(FLICKER_DEFAULT_POS);
+        flickerReloading = false;
+    }
+
+    // ========================================
+    // APRILTAG SCANNING TEMP
+    // ========================================
+
+    private void handleAprilTagScan() {
+        if (isButtonPressed(gamepad1.circle, prevAprilTagButton)) {
             if (aprilTagReader.getMotif() != null) {
                 telemetryM.addLine("Motif: " + aprilTagReader.getMotif());
             } else {
                 telemetryM.addLine("No Tag Found");
             }
         }
+    }
 
-        if (gamepad1.dpad_right && !prevDpadRight) {
-            servoPos += ServoIncrement;
-            servoPos = Math.max(0.0, Math.min(1.0, servoPos));
-            hood.setPosition(servoPos);
-        }
-        prevDpadRight = gamepad1.dpad_right;
-        if (gamepad1.dpad_left && !prevDpadLeft) {
-            servoPos -= 0.01;
-            servoPos = Math.max(0.0, Math.min(1.0, servoPos));
-            hood.setPosition(servoPos);
-        }
-        prevDpadLeft = gamepad1.dpad_left;
+    // ========================================
+    // HOOD ADJUSTMENT
+    // ========================================
 
-        // === TELEMETRY - Position data ===
+    private void handleHoodAdjustment() {
+        if (isButtonPressed(gamepad1.dpad_right, prevDpadRight)) {
+            adjustHoodPosition(SERVO_INCREMENT);
+        }
+
+        if (isButtonPressed(gamepad1.dpad_left, prevDpadLeft)) {
+            adjustHoodPosition(-SERVO_INCREMENT);
+        }
+    }
+
+    private void adjustHoodPosition(double change) {
+        servoPos += change;
+        servoPos = Math.max(0.0, Math.min(1.0, servoPos));
+        hood.setPosition(servoPos);
+    }
+
+    // ========================================
+    // TURN TO GOAL
+    // ========================================
+    private void turnToGoal(){
+        
+    }
+    // ========================================
+    // TELEMETRY
+    // ========================================
+
+    @SuppressLint("DefaultLocale")
+    private void updateTelemetry() {
+        displayPositionData();
+        displayMechanismStatus();
+        telemetryM.update();
+    }
+
+    private void displayPositionData() {
         telemetryM.addLine("=== Position ===");
         telemetryM.addLine("X: " + String.format("%.2f", follower.getPose().getX()));
         telemetryM.addLine("Y: " + String.format("%.2f", follower.getPose().getY()));
         telemetryM.addLine("BATTERY: " + String.format("%.2fV", batteryVoltageSensor.getVoltage()));
+    }
 
-        // === TELEMETRY - Mechanism status ===
+    private void displayMechanismStatus() {
         telemetryM.addLine("\n=== Mechanisms ===");
         telemetryM.addLine("Shooting: " + (shootingIsOn ? "ON" : "OFF"));
         telemetryM.addLine("Intake: " + (intakeIsOn ? "ON" : "OFF"));
         telemetryM.addLine("Outtake: " + (outtakeIsOn ? "ON" : "OFF"));
         telemetryM.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
-        telemetryM.addLine("Hood: " + (servoPos));
-
-        // Update telemetry display
-        telemetryM.update();
-
+        telemetryM.addLine("Hood: " + servoPos);
     }
 
-    /**
-     * Stop method - runs once when OpMode is stopped
-     * Safely shuts down all mechanisms
-     */
+    // ========================================
+    // CLEANUP
+    // ========================================
+
     @Override
     public void stop() {
-        // Stop all mechanisms when OpMode ends
+        stopAllMechanisms();
+        cleanupResources();
+    }
+
+    private void stopAllMechanisms() {
         if (flywheel != null) flywheel.setPower(0);
+        if (flywheel1 != null) flywheel1.setPower(0);
         if (intake != null) intake.setPower(0);
-        if (flicker != null) flicker.setPosition(flickerDefaultPos);
+        if (flicker != null) flicker.setPosition(FLICKER_DEFAULT_POS);
+        if (hood != null) hood.setPosition(HOOD_STARTING_POSITION);
+
         if (follower != null) {
             follower.breakFollowing();
             follower.setTeleOpDrive(0, 0, 0);
         }
-        if (aprilTagReader != null) aprilTagReader.close();  // Clean up camera
+    }
+
+    private void cleanupResources() {
+        if (aprilTagReader != null) aprilTagReader.close();
     }
 }
