@@ -23,10 +23,10 @@ public class CameraConstants {
             0, 18, 0, 0);
 
     // Camera calibration/intrinsic parameters (in pixels)
-    public static final double CAMERA_FX = 115.612000761;    // Focal length X
-    public static final double CAMERA_FY = 115.612000761;    // Focal length Y
-    public static final double CAMERA_CX = 395.22208662;     // Optical center X
-    public static final double CAMERA_CY = 300.762956164;    // Optical center Y
+    public static final double CAMERA_FX = 799.156132154;    // Focal length X
+    public static final double CAMERA_FY = 799.156132154;    // Focal length Y
+    public static final double CAMERA_CX = 430.02401894 ;     // Optical center X
+    public static final double CAMERA_CY = 327.070377292;    // Optical center Y
 
     // Camera resolution
     public static final int CAMERA_WIDTH = 640;    // Image width (pixels)

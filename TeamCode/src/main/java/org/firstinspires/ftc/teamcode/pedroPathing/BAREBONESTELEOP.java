@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -58,7 +59,7 @@ public class BAREBONESTELEOP extends OpMode {
     private static final double kP = 5.0;
     private static final double kI = 0.1;
     private static final double kD = 0.0;
-    private static final double kF = 0.0;
+    private static final double kF = 24;
 
     // ========================================
     // HARDWARE COMPONENTS
@@ -179,6 +180,11 @@ public class BAREBONESTELEOP extends OpMode {
         hood.setPosition(HOOD_STARTING_POSITION);
     }
 
+    @Override
+    public void start() {
+        follower.startTeleopDrive();
+    }
+
     // ========================================
     // MAIN LOOP
     // ========================================
@@ -187,7 +193,6 @@ public class BAREBONESTELEOP extends OpMode {
     @Override
     public void loop() {
         updateDriving();
-        updateButtonStates();
         handleMechanismToggles();
         handleFlickerReload();
         handleAprilTagScan();
@@ -201,8 +206,8 @@ public class BAREBONESTELEOP extends OpMode {
 
     private void updateDriving() {
         double drive = -gamepad1.left_stick_y;
-        double strafe = gamepad1.left_stick_x;
-        double turn = gamepad1.right_stick_x;
+        double strafe = -gamepad1.left_stick_x;
+        double turn = -gamepad1.right_stick_x;
 
         follower.setTeleOpDrive(drive, strafe, turn);
         follower.update();
@@ -212,20 +217,6 @@ public class BAREBONESTELEOP extends OpMode {
     // BUTTON MANAGEMENT
     // ========================================
 
-    private void updateButtonStates() {
-        prevShootButton = gamepad1.a;
-        prevIntakeButton = gamepad1.x;
-        prevOuttakeButton = gamepad1.square;
-        prevAprilTagButton = gamepad1.circle;
-        prevReloadButton = gamepad1.left_bumper;
-        prevDpadRight = gamepad1.dpad_right;
-        prevDpadLeft = gamepad1.dpad_left;
-    }
-
-    private boolean isButtonPressed(boolean current, boolean previous) {
-        return current && !previous;
-    }
-
     // ========================================
     // MECHANISM CONTROL
     // ========================================
@@ -233,11 +224,11 @@ public class BAREBONESTELEOP extends OpMode {
     private void handleMechanismToggles() {
         handleShootingToggle();
         handleIntakeToggle();
-        handleOuttakeToggle();
+
     }
 
     private void handleShootingToggle() {
-        if (isButtonPressed(gamepad1.a, prevShootButton)) {
+        if (gamepad1.bWasPressed()) {
             shootingIsOn = !shootingIsOn;
             flywheel.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
 
@@ -245,20 +236,11 @@ public class BAREBONESTELEOP extends OpMode {
     }
 
     private void handleIntakeToggle() {
-        if (isButtonPressed(gamepad1.x, prevIntakeButton)) {
+        if (gamepad1.aWasPressed()) {
             outtakeIsOn = false;
             intakeIsOn = !intakeIsOn;
-            intake.setDirection(DcMotor.Direction.FORWARD);
-            intake.setPower(intakeIsOn ? INTAKE_POWER : 0.0);
-        }
-    }
-
-    private void handleOuttakeToggle() {
-        if (isButtonPressed(gamepad1.square, prevOuttakeButton)) {
-            outtakeIsOn = !outtakeIsOn;
-            intakeIsOn = false;
             intake.setDirection(DcMotor.Direction.REVERSE);
-            intake.setPower(outtakeIsOn ? INTAKE_POWER : 0.0);
+            intake.setPower(intakeIsOn ? INTAKE_POWER : 0.0);
         }
     }
 
@@ -267,7 +249,7 @@ public class BAREBONESTELEOP extends OpMode {
     // ========================================
 
     private void handleFlickerReload() {
-        if (isButtonPressed(gamepad1.left_bumper, prevReloadButton) && !flickerReloading) {
+        if (gamepad1.leftBumperWasPressed() && !flickerReloading) {
             startFlickerSequence();
         }
 
@@ -292,7 +274,7 @@ public class BAREBONESTELEOP extends OpMode {
     // ========================================
 
     private void handleAprilTagScan() {
-        if (isButtonPressed(gamepad1.circle, prevAprilTagButton)) {
+        if (gamepad1.circleWasPressed()) {
             if (aprilTagReader.getMotif() != null) {
                 telemetryM.addLine("Motif: " + aprilTagReader.getMotif());
             } else {
@@ -306,11 +288,11 @@ public class BAREBONESTELEOP extends OpMode {
     // ========================================
 
     private void handleHoodAdjustment() {
-        if (isButtonPressed(gamepad1.dpad_right, prevDpadRight)) {
+        if (gamepad1.dpad_up){
             adjustHoodPosition(SERVO_INCREMENT);
         }
 
-        if (isButtonPressed(gamepad1.dpad_left, prevDpadLeft)) {
+        if (gamepad1.dpad_down) {
             adjustHoodPosition(-SERVO_INCREMENT);
         }
     }

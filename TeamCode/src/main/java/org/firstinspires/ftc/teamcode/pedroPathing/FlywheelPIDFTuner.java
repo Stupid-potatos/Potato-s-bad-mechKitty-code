@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.teamcode.Potato_Assets.TuningController;
+import com.bylazar.telemetry.PanelsTelemetry;
 
 /**
  *  A TeleOp mode for tuning the PIDF on the flywheel motor using fullpanels.
@@ -21,18 +22,21 @@ import org.firstinspires.ftc.teamcode.Potato_Assets.TuningController;
 public class FlywheelPIDFTuner extends LinearOpMode {
 
     // Configurable on fullpanels
-    public static double kP = 5.0;
+    public static double kP = 5;
     public static double kI = 0.1;
     public static double kD = 0.0;
-    public static double kF = 12.5;
+    public static double kF = 24;
 
     private VoltageSensor batteryVoltageSensor;
     private final ElapsedTime time = new ElapsedTime();
+    private PanelsTelemetry telemetryP = PanelsTelemetry.INSTANCE;
+
 
     @Override
     public void runOpMode() {
         // Get motor from hardware map
         DcMotorEx myMotor = hardwareMap.get(DcMotorEx.class, "flywheel");
+        DcMotorEx myMotor1 = hardwareMap.get(DcMotorEx.class, "flywheel1");
         // myMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Enable bulk caching for better performance
@@ -45,15 +49,19 @@ public class FlywheelPIDFTuner extends LinearOpMode {
         motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
         myMotor.setMotorType(motorConfigurationType);
 
+        MotorConfigurationType motorConfigurationType1 = myMotor1.getMotorType().clone();
+        motorConfigurationType1.setAchieveableMaxRPMFraction(1.0);
+        myMotor1.setMotorType(motorConfigurationType1);
+
         // Enable encoder-based velocity control
         myMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
+        myMotor1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         // Get battery voltage sensor for compensation
         batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         // Apply initial PIDF coefficients
         setPIDFCoefficients(myMotor, kP, kI, kD, kF);
-
+        setPIDFCoefficients(myMotor1, kP, kI, kD, kF);
         // Create tuning controller (automatically varies target velocity)
         TuningController tuningController = new TuningController();
 
@@ -97,6 +105,9 @@ public class FlywheelPIDFTuner extends LinearOpMode {
             telemetry.addData("Current", "%.0f ticks/sec", motorVelocity);
             telemetry.addData("Error", "%.0f ticks/sec (%.1f%%)", error, percentError);
             telemetry.addLine();
+            telemetryP.getTelemetry().addData("targetV",targetVelocity);
+            telemetryP.getTelemetry().addData("motorV",motorVelocity);
+            telemetryP.getTelemetry().addData("error",error);
 
             telemetry.addLine("=== PIDF VALUES ===");
             telemetry.addData("P", "%.3f", kP);
@@ -117,6 +128,17 @@ public class FlywheelPIDFTuner extends LinearOpMode {
             // Check if PIDF values changed and apply them
             if (lastKp != kP || lastKi != kI || lastKd != kD || lastKf != kF) {
                 setPIDFCoefficients(myMotor, kP, kI, kD, kF);
+
+                lastKp = kP;
+                lastKi = kI;
+                lastKd = kD;
+                lastKf = kF;
+
+                telemetry.addLine();
+                telemetry.addLine("✓ PIDF values updated!");
+            }
+            if (lastKp != kP || lastKi != kI || lastKd != kD || lastKf != kF) {
+                setPIDFCoefficients(myMotor1, kP, kI, kD, kF);
 
                 lastKp = kP;
                 lastKi = kI;
