@@ -10,12 +10,13 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
+
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.Constants;
 import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 
@@ -27,35 +28,48 @@ import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
  * - Left stick Y: Forward/Backward
  * - Left stick X: Strafe left/right
  * - Right stick X: Rotation
- * - A: Toggle shooting
- * - X: Toggle intake
- * - Square: Toggle outtake
+ * - Y: Toggle shooting
+ * - B: Toggle intake
  * - Circle: Scan AprilTag
  * - Left Bumper: Reload/flick
- * - D-pad Right: Increase hood position
- * - D-pad Left: Decrease hood position
+ * - Left Trigger: turn to goal
+ * - D-pad up: Increase hood position
+ * - D-pad down: Decrease hood position
  *
  * @author Potato
+ * @author ricxuuuu
+ * TODO:
+ *      based on distance (odometry, if within d1 distance of goal, hood angle and motor speed = ..., for 3 spots)
+ *          inside turntogoal()
+ *      can get rid of motif finder, that just needs to work during testing to get correct motif for auton
+ *
  */
-@TeleOp(name = "BAREBONE_TELEOP", group = "Potato's testing")
-public class BAREBONESTELEOP extends OpMode {
+@TeleOp(name = "Potato_TeleOp", group = "Potato's testing")
+public class Potato_TeleOp extends OpMode {
 
     // ========================================
     // CONSTANTS
     // ========================================
 
+    /*
+    Change before game to determine which alliance you are on!!!!
+     */
+    boolean is_blue_alliance = false;
+
     // Servo positions
     private static final double FLICKER_DEFAULT_POS = 0.13;
-    private static final double FLICKER_MAX_POS = 0.45;
+    private static final double FLICKER_MAX_POS = 0.80;
     private static final double SERVO_INCREMENT = 0.02;
     private static final double HOOD_STARTING_POSITION = 0.00; // TEMP VALUE
+    private ElapsedTime hoodTimer = new ElapsedTime();
+    private static final double HOOD_ADJUST_DELAY = 0.05;
 
     // Motor settings
     private static final double INTAKE_POWER = 0.3;
     private static final double SHOOTING_SPEED = 3000;
     private static final double SHOOTING_DELAY_SECONDS = 0.3;
 
-    // PIDF coefficients TEMP
+    // PIDF coefficients (~3-6% error)
     private static final double kP = 5.0;
     private static final double kI = 0.1;
     private static final double kD = 0.0;
@@ -97,15 +111,6 @@ public class BAREBONESTELEOP extends OpMode {
 
     // Hood position
     private double servoPos = 0.5;
-
-    // Button edge detection
-    private boolean prevShootButton = false;
-    private boolean prevIntakeButton = false;
-    private boolean prevOuttakeButton = false;
-    private boolean prevAprilTagButton = false;
-    private boolean prevReloadButton = false;
-    private boolean prevDpadRight = false;
-    private boolean prevDpadLeft = false;
 
     // ========================================
     // INITIALIZATION
@@ -193,6 +198,7 @@ public class BAREBONESTELEOP extends OpMode {
     @Override
     public void loop() {
         updateDriving();
+        turnToGoal();
         handleMechanismToggles();
         handleFlickerReload();
         handleAprilTagScan();
@@ -214,27 +220,21 @@ public class BAREBONESTELEOP extends OpMode {
     }
 
     // ========================================
-    // BUTTON MANAGEMENT
-    // ========================================
-
-    // ========================================
     // MECHANISM CONTROL
     // ========================================
 
     private void handleMechanismToggles() {
         handleShootingToggle();
         handleIntakeToggle();
-
     }
 
     private void handleShootingToggle() {
         if (gamepad1.bWasPressed()) {
             shootingIsOn = !shootingIsOn;
             flywheel.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
-
+            flywheel1.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
         }
     }
-
     private void handleIntakeToggle() {
         if (gamepad1.aWasPressed()) {
             outtakeIsOn = false;
@@ -243,11 +243,9 @@ public class BAREBONESTELEOP extends OpMode {
             intake.setPower(intakeIsOn ? INTAKE_POWER : 0.0);
         }
     }
-
     // ========================================
     // FLICKER CONTROL
     // ========================================
-
     private void handleFlickerReload() {
         if (gamepad1.leftBumperWasPressed() && !flickerReloading) {
             startFlickerSequence();
@@ -272,7 +270,6 @@ public class BAREBONESTELEOP extends OpMode {
     // ========================================
     // APRILTAG SCANNING TEMP
     // ========================================
-
     private void handleAprilTagScan() {
         if (gamepad1.circleWasPressed()) {
             if (aprilTagReader.getMotif() != null) {
@@ -288,12 +285,13 @@ public class BAREBONESTELEOP extends OpMode {
     // ========================================
 
     private void handleHoodAdjustment() {
-        if (gamepad1.dpad_up){
-            adjustHoodPosition(SERVO_INCREMENT);
-        }
-
-        if (gamepad1.dpad_down) {
-            adjustHoodPosition(-SERVO_INCREMENT);
+        if (hoodTimer.seconds() >= HOOD_ADJUST_DELAY) {
+            if (gamepad1.dpad_up) {
+                adjustHoodPosition(SERVO_INCREMENT);
+            }
+            if (gamepad1.dpad_down) {
+                adjustHoodPosition(-SERVO_INCREMENT);
+            }
         }
     }
 
@@ -307,8 +305,40 @@ public class BAREBONESTELEOP extends OpMode {
     // TURN TO GOAL
     // ========================================
     private void turnToGoal(){
-        
+        if (gamepad1.left_trigger > 0.13 && gamepad1.right_trigger < 0.13) {
+            is_blue_alliance = true;
+            follower.turnTo(findIdealGoalAngle(is_blue_alliance));
+            //follower.findIdealLaunchAngle(is_blue_alliance);
+        }
+        if (gamepad1.right_trigger > 0.13 && gamepad1.left_trigger < 0.13) {
+            is_blue_alliance = false;
+            follower.turnTo(findIdealGoalAngle(is_blue_alliance));
+            //follower.findIdealLaunchAngle(is_blue_alliance);
+        }
+        follower.update();
     }
+    public double findIdealGoalAngle(boolean is_blue_alliance) {
+        double angle = 0;
+
+        if (is_blue_alliance) {
+            angle = Math.atan2(-72 - follower.getPose().getY(), -72 - follower.getPose().getX());
+        } else {
+            angle = Math.atan2(72 - follower.getPose().getY(), -72 - follower.getPose().getX());
+        }
+        return angle;
+    }
+
+    // For when we get formula for turning hood position to goal
+    public double findHypotenuseFromGoal (boolean is_blue_alliance) {
+        double hypotenuse = 0;
+        if (is_blue_alliance) {
+            hypotenuse = Math.hypot(Math.abs(-72 -follower.getPose().getX()), Math.abs(-72 - follower.getPose().getY()));
+        } else {
+            hypotenuse = Math.hypot(Math.abs(-72 -follower.getPose().getX()), Math.abs(72 - follower.getPose().getY()));
+        }
+        return hypotenuse;
+    }
+
     // ========================================
     // TELEMETRY
     // ========================================
@@ -320,6 +350,7 @@ public class BAREBONESTELEOP extends OpMode {
         telemetryM.update();
     }
 
+    @SuppressLint("DefaultLocale")
     private void displayPositionData() {
         telemetryM.addLine("=== Position ===");
         telemetryM.addLine("X: " + String.format("%.2f", follower.getPose().getX()));
@@ -358,7 +389,6 @@ public class BAREBONESTELEOP extends OpMode {
             follower.setTeleOpDrive(0, 0, 0);
         }
     }
-
     private void cleanupResources() {
         if (aprilTagReader != null) aprilTagReader.close();
     }
