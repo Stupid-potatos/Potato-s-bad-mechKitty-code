@@ -10,7 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-
+import org.firstinspires.ftc.teamcode.Potato_Assets.Config;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -39,7 +39,7 @@ import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
  * @author Potato
  * @author ricxuuuu
  * TODO:
- *      based on distance (odometry, if within d1 distance of goal, hood angle and motor speed = ..., for 3 spots)
+ *      based on distance (odometry, if within d1 distance of goal, hood angle and motor speed = ..., for 3 distances)
  *          inside turntogoal()
  *      can get rid of motif finder, that just needs to work during testing to get correct motif for auton
  *
@@ -54,20 +54,8 @@ public class Potato_TeleOp extends OpMode {
     /*
     Change before game to determine which alliance you are on!!!!
      */
-    boolean is_blue_alliance = false;
+    boolean is_blue_alliance = true;
 
-    // Servo positions
-    private static final double FLICKER_DEFAULT_POS = 0.13;
-    private static final double FLICKER_MAX_POS = 0.80;
-    private static final double SERVO_INCREMENT = 0.02;
-    private static final double HOOD_STARTING_POSITION = 0.00; // TEMP VALUE
-    private ElapsedTime hoodTimer = new ElapsedTime();
-    private static final double HOOD_ADJUST_DELAY = 0.05;
-
-    // Motor settings
-    private static final double INTAKE_POWER = 0.3;
-    private static final double SHOOTING_SPEED = 3000;
-    private static final double SHOOTING_DELAY_SECONDS = 0.3;
 
     // PIDF coefficients (~3-6% error)
     private static final double kP = 5.0;
@@ -111,6 +99,7 @@ public class Potato_TeleOp extends OpMode {
 
     // Hood position
     private double servoPos = 0.5;
+    private ElapsedTime hoodTimer = new ElapsedTime();
 
     // ========================================
     // INITIALIZATION
@@ -167,11 +156,11 @@ public class Potato_TeleOp extends OpMode {
     private void configurePIDFCoefficients() {
         flywheel.setPIDFCoefficients(
                 DcMotor.RunMode.RUN_USING_ENCODER,
-                new PIDFCoefficients(kP, kI, kD, kF)
+                new PIDFCoefficients(Config.kP, Config.kI, Config.kD, Config.kF)
         );
         flywheel1.setPIDFCoefficients(
                 DcMotor.RunMode.RUN_USING_ENCODER,
-                new PIDFCoefficients(kP, kI, kD, kF)
+                new PIDFCoefficients(Config.kP, Config.kI, Config.kD, Config.kF)
         );
     }
 
@@ -181,8 +170,8 @@ public class Potato_TeleOp extends OpMode {
     }
 
     private void setInitialPositions() {
-        flicker.setPosition(FLICKER_DEFAULT_POS);
-        hood.setPosition(HOOD_STARTING_POSITION);
+        flicker.setPosition(Config.FLICKER_DEFAULT_POS);
+        hood.setPosition(Config.HOOD_STARTING_POSITION);
     }
 
     @Override
@@ -231,8 +220,8 @@ public class Potato_TeleOp extends OpMode {
     private void handleShootingToggle() {
         if (gamepad1.bWasPressed()) {
             shootingIsOn = !shootingIsOn;
-            flywheel.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
-            flywheel1.setVelocity(shootingIsOn ? SHOOTING_SPEED : 0);
+            flywheel.setVelocity(shootingIsOn ? Config.SHOOTING_SPEED : 0);
+            flywheel1.setVelocity(shootingIsOn ? Config.SHOOTING_SPEED : 0);
         }
     }
     private void handleIntakeToggle() {
@@ -240,7 +229,7 @@ public class Potato_TeleOp extends OpMode {
             outtakeIsOn = false;
             intakeIsOn = !intakeIsOn;
             intake.setDirection(DcMotor.Direction.REVERSE);
-            intake.setPower(intakeIsOn ? INTAKE_POWER : 0.0);
+            intake.setPower(intakeIsOn ? Config.INTAKE_POWER : 0.0);
         }
     }
     // ========================================
@@ -251,19 +240,19 @@ public class Potato_TeleOp extends OpMode {
             startFlickerSequence();
         }
 
-        if (flickerReloading && flickerTimer.seconds() >= SHOOTING_DELAY_SECONDS) {
+        if (flickerReloading && flickerTimer.seconds() >= Config.SHOOTING_DELAY_SECONDS) {
             endFlickerSequence();
         }
     }
 
     private void startFlickerSequence() {
-        flicker.setPosition(FLICKER_MAX_POS);
+        flicker.setPosition(Config.FLICKER_MAX);
         flickerTimer.reset();
         flickerReloading = true;
     }
 
     private void endFlickerSequence() {
-        flicker.setPosition(FLICKER_DEFAULT_POS);
+        flicker.setPosition(Config.FLICKER_DEFAULT);
         flickerReloading = false;
     }
 
@@ -285,12 +274,12 @@ public class Potato_TeleOp extends OpMode {
     // ========================================
 
     private void handleHoodAdjustment() {
-        if (hoodTimer.seconds() >= HOOD_ADJUST_DELAY) {
+        if (hoodTimer.seconds() >= Config.HOOD_ADJUST_DELAY) {
             if (gamepad1.dpad_up) {
-                adjustHoodPosition(SERVO_INCREMENT);
+                adjustHoodPosition(Config.SERVO_INCREMENT);
             }
             if (gamepad1.dpad_down) {
-                adjustHoodPosition(-SERVO_INCREMENT);
+                adjustHoodPosition(-Config.SERVO_INCREMENT);
             }
         }
     }
@@ -304,39 +293,30 @@ public class Potato_TeleOp extends OpMode {
     // ========================================
     // TURN TO GOAL
     // ========================================
+
+    private double[] getGoalPosition() {
+        return is_blue_alliance
+                ? new double[]{Config.BLUE_GOAL_X, Config.BLUE_GOAL_Y}
+                : new double[]{Config.RED_GOAL_X, Config.RED_GOAL_Y};
+    }
     private void turnToGoal(){
-        if (gamepad1.left_trigger > 0.13 && gamepad1.right_trigger < 0.13) {
-            is_blue_alliance = true;
-            follower.turnTo(findIdealGoalAngle(is_blue_alliance));
-            //follower.findIdealLaunchAngle(is_blue_alliance);
-        }
-        if (gamepad1.right_trigger > 0.13 && gamepad1.left_trigger < 0.13) {
-            is_blue_alliance = false;
-            follower.turnTo(findIdealGoalAngle(is_blue_alliance));
-            //follower.findIdealLaunchAngle(is_blue_alliance);
+        if (gamepad1.left_trigger > 0.13 && !follower.isBusy()) {
+            follower.turnTo(findIdealGoalAngle());
+            //follower.findIdealLaunchAngle();
         }
         follower.update();
     }
-    public double findIdealGoalAngle(boolean is_blue_alliance) {
-        double angle = 0;
-
-        if (is_blue_alliance) {
-            angle = Math.atan2(-72 - follower.getPose().getY(), -72 - follower.getPose().getX());
-        } else {
-            angle = Math.atan2(72 - follower.getPose().getY(), -72 - follower.getPose().getX());
-        }
-        return angle;
+    public double findIdealGoalAngle() {
+        double[] goal = getGoalPosition();
+        return Math.atan2(goal[1] - follower.getPose().getY(),
+                goal[0] - follower.getPose().getX());
     }
 
     // For when we get formula for turning hood position to goal
-    public double findHypotenuseFromGoal (boolean is_blue_alliance) {
-        double hypotenuse = 0;
-        if (is_blue_alliance) {
-            hypotenuse = Math.hypot(Math.abs(-72 -follower.getPose().getX()), Math.abs(-72 - follower.getPose().getY()));
-        } else {
-            hypotenuse = Math.hypot(Math.abs(-72 -follower.getPose().getX()), Math.abs(72 - follower.getPose().getY()));
-        }
-        return hypotenuse;
+    public double findHypotenuseFromGoal() {
+        double[] goal = getGoalPosition();
+        return Math.hypot(goal[0] - follower.getPose().getX(),
+                goal[1] - follower.getPose().getY());
     }
 
     // ========================================
@@ -381,8 +361,8 @@ public class Potato_TeleOp extends OpMode {
         if (flywheel != null) flywheel.setPower(0);
         if (flywheel1 != null) flywheel1.setPower(0);
         if (intake != null) intake.setPower(0);
-        if (flicker != null) flicker.setPosition(FLICKER_DEFAULT_POS);
-        if (hood != null) hood.setPosition(HOOD_STARTING_POSITION);
+        if (flicker != null) flicker.setPosition(Config.FLICKER_DEFAULT);
+        if (hood != null) hood.setPosition(Config.HOOD_STARTING_POSITION);
 
         if (follower != null) {
             follower.breakFollowing();
