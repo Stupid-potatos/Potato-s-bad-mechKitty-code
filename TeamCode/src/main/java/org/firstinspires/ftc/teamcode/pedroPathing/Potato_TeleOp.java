@@ -16,7 +16,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
 import org.firstinspires.ftc.teamcode.Constants;
 import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
 
@@ -56,12 +56,6 @@ public class Potato_TeleOp extends OpMode {
      */
     boolean is_blue_alliance = true;
 
-
-    // PIDF coefficients (~3-6% error)
-    private static final double kP = 5.0;
-    private static final double kI = 0.1;
-    private static final double kD = 0.0;
-    private static final double kF = 24;
 
     // ========================================
     // HARDWARE COMPONENTS
@@ -187,8 +181,12 @@ public class Potato_TeleOp extends OpMode {
     @Override
     public void loop() {
         updateDriving();
+        VariableFlyWheelSpeeds(findHypotenuseFromGoal());
         turnToGoal();
         handleMechanismToggles();
+        if (shootingIsOn) {
+            updateFlywheelSpeed();
+        }
         handleFlickerReload();
         handleAprilTagScan();
         handleHoodAdjustment();
@@ -220,13 +218,20 @@ public class Potato_TeleOp extends OpMode {
     private void handleShootingToggle() {
         if (gamepad1.bWasPressed()) {
             shootingIsOn = !shootingIsOn;
-            flywheel.setVelocity(shootingIsOn ? Config.SHOOTING_SPEED : 0);
-            flywheel1.setVelocity(shootingIsOn ? Config.SHOOTING_SPEED : 0);
+            updateFlywheelSpeed();
+        }
+    }
+    private void updateFlywheelSpeed() {
+        if (shootingIsOn) {
+            flywheel.setVelocity(Config.SHOOTINGSPEEDCURRENT);
+            flywheel1.setVelocity(Config.SHOOTINGSPEEDCURRENT);
+        } else {
+            flywheel.setVelocity(0);
+            flywheel1.setVelocity(0);
         }
     }
     private void handleIntakeToggle() {
         if (gamepad1.aWasPressed()) {
-            outtakeIsOn = false;
             intakeIsOn = !intakeIsOn;
             intake.setDirection(DcMotor.Direction.REVERSE);
             intake.setPower(intakeIsOn ? Config.INTAKE_POWER : 0.0);
@@ -302,7 +307,11 @@ public class Potato_TeleOp extends OpMode {
     private void turnToGoal(){
         if (gamepad1.left_trigger > 0.13 && !follower.isBusy()) {
             follower.turnTo(findIdealGoalAngle());
-            //follower.findIdealLaunchAngle();
+            double hoodAngle = CalculateHoodAngle(findHypotenuseFromGoal()) / Config.MAX_HOOD_ANGLE; // COULD remove max_hood_angle.
+            hood.setPosition(hoodAngle);
+            telemetryM.addLine("Distance: "+ findHypotenuseFromGoal());
+            telemetryM.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
+            telemetryM.update();
         }
         follower.update();
     }
@@ -317,6 +326,47 @@ public class Potato_TeleOp extends OpMode {
         double[] goal = getGoalPosition();
         return Math.hypot(goal[0] - follower.getPose().getX(),
                 goal[1] - follower.getPose().getY());
+    }
+
+    public double CalculateHoodAngle(double distance){
+        double [][] COEFFICIENTS = {
+                // {m,b}
+                {1,0.5},
+                {1.3,2},
+                {2.3,6},
+        };
+        int selector = VariableFlyWheelSpeeds(distance);
+        double m = COEFFICIENTS[selector][0];
+        double b = COEFFICIENTS[selector][1];
+        return m * distance + b;
+        }
+
+
+    public int VariableFlyWheelSpeeds(double distance){
+        int speedZone;
+
+        if (distance <= 2.0) {
+            speedZone = 0;
+        } else if (distance <= 5.0) {
+            speedZone = 1;
+        } else {
+            speedZone = 2; // Everything 5+ uses far shot
+        }
+
+        // Set flywheel speed based on zone
+        switch (speedZone) {
+            case 0:
+                Config.SHOOTINGSPEEDCURRENT = Config.CLOSESHOTSPEED;
+                break;
+            case 1:
+                Config.SHOOTINGSPEEDCURRENT = Config.MEDIUMSHOTSPEED;
+                break;
+            case 2:
+                Config.SHOOTINGSPEEDCURRENT = Config.FARSHOTSPEED;
+                break;
+        }
+
+        return speedZone;
     }
 
     // ========================================
@@ -338,13 +388,33 @@ public class Potato_TeleOp extends OpMode {
         telemetryM.addLine("BATTERY: " + String.format("%.2fV", batteryVoltageSensor.getVoltage()));
     }
 
+    @SuppressLint("DefaultLocale")
     private void displayMechanismStatus() {
+        double distance = findHypotenuseFromGoal();
+        int speedZone = getSpeedZone(distance); // New helper method
+        String zoneName = getZoneName(speedZone);
         telemetryM.addLine("\n=== Mechanisms ===");
         telemetryM.addLine("Shooting: " + (shootingIsOn ? "ON" : "OFF"));
+        telemetryM.addLine("FlyWheel Speed: " + Config.SHOOTINGSPEEDCURRENT);
         telemetryM.addLine("Intake: " + (intakeIsOn ? "ON" : "OFF"));
         telemetryM.addLine("Outtake: " + (outtakeIsOn ? "ON" : "OFF"));
         telemetryM.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
-        telemetryM.addLine("Hood: " + servoPos);
+        telemetryM.addLine("Hood: " + String.format("%.3f", hood.getPosition()));
+        telemetryM.addLine("Zone: " + zoneName + " (" + speedZone + ")");
+    }
+    private int getSpeedZone(double distance) {
+        if (distance <= 2.0) return 0;
+        if (distance <= 5.0) return 1;
+        return 2;
+    }
+
+    private String getZoneName(int zone) {
+        switch (zone) {
+            case 0: return "CLOSE";
+            case 1: return "MEDIUM";
+            case 2: return "FAR";
+            default: return "UNKNOWN";
+        }
     }
 
     // ========================================
