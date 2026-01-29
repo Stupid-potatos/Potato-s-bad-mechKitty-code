@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -39,8 +40,6 @@ import org.firstinspires.ftc.teamcode.Potato_Assets.AprilTagReader;
  * @author Potato
  * @author ricxuuuu
  * TODO:
- *      based on distance (odometry, if within d1 distance of goal, hood angle and motor speed = ..., for 3 distances)
- *          inside turntogoal()
  *      can get rid of motif finder, that just needs to work during testing to get correct motif for auton
  *
  */
@@ -55,6 +54,7 @@ public class Potato_TeleOp extends OpMode {
     Change before game to determine which alliance you are on!!!!
      */
     boolean is_blue_alliance = true;
+    boolean next_to_goal = false;
 
 
     // ========================================
@@ -94,6 +94,7 @@ public class Potato_TeleOp extends OpMode {
     // Hood position
     private double servoPos = 0.5;
     private ElapsedTime hoodTimer = new ElapsedTime();
+    Pose StartingPose;
 
     // ========================================
     // INITIALIZATION
@@ -101,6 +102,12 @@ public class Potato_TeleOp extends OpMode {
 
     @Override
     public void init() {
+        // WILL GET REMOVED DURING COMP
+        Pose startingPose = is_blue_alliance
+                ? (next_to_goal ? Config.BLUE_NEAR_GOAL_START : Config.BLUE_FAR_START)
+                : (next_to_goal ? Config.RED_NEAR_GOAL_START : Config.RED_FAR_START);
+
+        follower.setStartingPose(startingPose);
         initializeTelemetry();
         initializeHardware();
         configureBulkReading();
@@ -109,8 +116,8 @@ public class Potato_TeleOp extends OpMode {
         initializeSensors();
         setInitialPositions();
 
-        telemetryM.addLine("Robot initialized - Ready to go!");
-        telemetryM.update();
+        telemetry.addLine("Robot initialized - Ready to go!");
+        telemetry.update();
     }
 
     private void initializeTelemetry() {
@@ -148,6 +155,7 @@ public class Potato_TeleOp extends OpMode {
     }
 
     private void configurePIDFCoefficients() {
+
         flywheel.setPIDFCoefficients(
                 DcMotor.RunMode.RUN_USING_ENCODER,
                 new PIDFCoefficients(Config.kP, Config.kI, Config.kD, Config.kF)
@@ -184,9 +192,7 @@ public class Potato_TeleOp extends OpMode {
         VariableFlyWheelSpeeds(findHypotenuseFromGoal());
         turnToGoal();
         handleMechanismToggles();
-        if (shootingIsOn) {
-            updateFlywheelSpeed();
-        }
+        updateFlywheelSpeed();
         handleFlickerReload();
         handleAprilTagScan();
         handleHoodAdjustment();
@@ -309,12 +315,40 @@ public class Potato_TeleOp extends OpMode {
             follower.turnTo(findIdealGoalAngle());
             double hoodAngle = CalculateHoodAngle(findHypotenuseFromGoal()) / Config.MAX_HOOD_ANGLE; // COULD remove max_hood_angle.
             hood.setPosition(hoodAngle);
-            telemetryM.addLine("Distance: "+ findHypotenuseFromGoal());
-            telemetryM.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
-            telemetryM.update();
+            telemetry.addLine("Distance: "+ findHypotenuseFromGoal());
+            telemetry.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
+            telemetry.update();
         }
         follower.update();
     }
+    /* this ver will most likely work
+    private void turnToGoal(){
+        if (gamepad1.left_trigger > 0.13) {
+            double targetHeading = findIdealGoalAngle();
+
+            // Calculate turn amount needed
+            double currentHeading = follower.getPose().getHeading();
+            double headingError = targetHeading - currentHeading;
+
+            // Normalize to -PI to PI
+            while (headingError > Math.PI) headingError -= 2 * Math.PI;
+            while (headingError < -Math.PI) headingError += 2 * Math.PI;
+
+            // Apply proportional turn control
+            double turnPower = headingError * 0.5; // Adjust multiplier as needed
+            turnPower = Math.max(-1, Math.min(1, turnPower)); // Clamp to [-1, 1]
+
+            follower.setTeleOpDrive(0, 0, turnPower);
+
+            // Update hood
+            double hoodAngle = CalculateHoodAngle(findHypotenuseFromGoal()) / Config.MAX_HOOD_ANGLE;
+            hood.setPosition(hoodAngle);
+
+            telemetry.addLine("Distance: "+ findHypotenuseFromGoal());
+            telemetry.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
+        }
+    }
+     */
     public double findIdealGoalAngle() {
         double[] goal = getGoalPosition();
         return Math.atan2(goal[1] - follower.getPose().getY(),
@@ -345,9 +379,9 @@ public class Potato_TeleOp extends OpMode {
     public int VariableFlyWheelSpeeds(double distance){
         int speedZone;
 
-        if (distance <= 2.0) {
+        if (distance <= 10.0) {
             speedZone = 0;
-        } else if (distance <= 5.0) {
+        } else if (distance <= 30.0) {
             speedZone = 1;
         } else {
             speedZone = 2; // Everything 5+ uses far shot
@@ -377,15 +411,15 @@ public class Potato_TeleOp extends OpMode {
     private void updateTelemetry() {
         displayPositionData();
         displayMechanismStatus();
-        telemetryM.update();
+        telemetry.update();
     }
 
     @SuppressLint("DefaultLocale")
     private void displayPositionData() {
-        telemetryM.addLine("=== Position ===");
-        telemetryM.addLine("X: " + String.format("%.2f", follower.getPose().getX()));
-        telemetryM.addLine("Y: " + String.format("%.2f", follower.getPose().getY()));
-        telemetryM.addLine("BATTERY: " + String.format("%.2fV", batteryVoltageSensor.getVoltage()));
+        telemetry.addLine("=== Position ===");
+        telemetry.addLine("X: " + String.format("%.2f", follower.getPose().getX()));
+        telemetry.addLine("Y: " + String.format("%.2f", follower.getPose().getY()));
+        telemetry.addLine("BATTERY: " + String.format("%.2fV", batteryVoltageSensor.getVoltage()));
     }
 
     @SuppressLint("DefaultLocale")
@@ -393,14 +427,14 @@ public class Potato_TeleOp extends OpMode {
         double distance = findHypotenuseFromGoal();
         int speedZone = getSpeedZone(distance); // New helper method
         String zoneName = getZoneName(speedZone);
-        telemetryM.addLine("\n=== Mechanisms ===");
-        telemetryM.addLine("Shooting: " + (shootingIsOn ? "ON" : "OFF"));
-        telemetryM.addLine("FlyWheel Speed: " + Config.SHOOTINGSPEEDCURRENT);
-        telemetryM.addLine("Intake: " + (intakeIsOn ? "ON" : "OFF"));
-        telemetryM.addLine("Outtake: " + (outtakeIsOn ? "ON" : "OFF"));
-        telemetryM.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
-        telemetryM.addLine("Hood: " + String.format("%.3f", hood.getPosition()));
-        telemetryM.addLine("Zone: " + zoneName + " (" + speedZone + ")");
+        telemetry.addLine("\n=== Mechanisms ===");
+        telemetry.addLine("Shooting: " + (shootingIsOn ? "ON" : "OFF"));
+        telemetry.addLine("FlyWheel Speed: " + Config.SHOOTINGSPEEDCURRENT);
+        telemetry.addLine("Intake: " + (intakeIsOn ? "ON" : "OFF"));
+        telemetry.addLine("Outtake: " + (outtakeIsOn ? "ON" : "OFF"));
+        telemetry.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
+        telemetry.addLine("Hood: " + String.format("%.3f", hood.getPosition()));
+        telemetry.addLine("Zone: " + zoneName + " (" + speedZone + ")");
     }
     private int getSpeedZone(double distance) {
         if (distance <= 2.0) return 0;
