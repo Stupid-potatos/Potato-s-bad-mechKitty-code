@@ -72,8 +72,8 @@ public class Constants {
             .hardwareMapName("pinpoint")
             .distanceUnit(DistanceUnit.INCH)
             // Physical pod positions (measure from center of rotation)
-            .forwardPodY(3.75)   // How far forward/back the forward pod is (in inches)
-            .strafePodX(1.959)    // How far left/right the strafe pod is (in inches)
+            .forwardPodY(4.560393701)   // How far forward/back the forward pod is (in inches)
+            .strafePodX(1.1)    // How far left/right the strafe pod is (in inches)
 
             // Which goBILDA pods you're using
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
