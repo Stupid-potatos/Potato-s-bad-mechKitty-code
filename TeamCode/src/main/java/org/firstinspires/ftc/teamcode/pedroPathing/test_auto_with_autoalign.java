@@ -31,7 +31,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
 @Autonomous(name = "BLUE Test Auto", group = "Potato's testing")
-public class test_auto extends OpMode {
+public class test_auto_with_autoalign extends OpMode {
     // ============================================
     // APRILTAG LOCALIZATION
     // ============================================
@@ -59,6 +59,8 @@ public class test_auto extends OpMode {
     // Shooting system state
     boolean shootingIsOn;  // True when flywheels are spinning for shooting
     int shotsFired = 0;    // Counts how many shots have been fired in current cycle
+    boolean isAligned = false;  // Tracks if robot is aligned to goal
+    boolean needsAlignment = false;  // Tracks if we need to align before shooting
 
     // ============================================
     // SERVO DECLARATIONS
@@ -76,6 +78,7 @@ public class test_auto extends OpMode {
     private Timer shootTimer;   // Controls timing between shots
     private Timer opmodeTimer;  // Tracks total opmode runtime
     private Timer localizationTimer;  // Controls how often we localize with AprilTags
+    private Timer alignmentTimer;  // Times alignment attempts
 
     private int pathState;  // Current state in our autonomous state machine
 
@@ -155,6 +158,68 @@ public class test_auto extends OpMode {
                     telemetry.addLine("Localized via AprilTag 20!");
                 }
             }
+        }
+    }
+
+    /**
+     * Calculates the ideal angle to aim at the goal based on current robot position.
+     * @param is_blue_alliance True if on blue alliance, false for red
+     * @return Ideal heading angle in radians to face the goal
+     */
+    public double findIdealGoalAngle(boolean is_blue_alliance) {
+        double angle = 0;
+        Pose currentPose = follower.getPose();
+
+        // Convert mm to inches for calculation
+        double robotX = currentPose.getX() / 25.4;  // mm to inches
+        double robotY = currentPose.getY() / 25.4;  // mm to inches
+
+        // Find angle to point at goal
+        if (is_blue_alliance) {
+            // Blue alliance goal is at (-72, -72) inches
+            angle = Math.atan2(-72 - robotY, -72 - robotX);
+        } else {
+            // Red alliance goal is at (72, -72) inches
+            angle = Math.atan2(72 - robotY, -72 - robotX);
+        }
+
+        return angle;
+    }
+
+    /**
+     * Aligns the robot to face the goal using AprilTag localization.
+     * Returns true when aligned within tolerance.
+     */
+    public boolean alignToGoal() {
+        // First, localize using AprilTags
+        localizeViaAprilTag();
+
+        // Calculate ideal angle to goal
+        double targetAngle = findIdealGoalAngle(is_blue_alliance);
+        double currentAngle = follower.getPose().getHeading();
+
+        // Calculate heading error
+        double headingError = targetAngle - currentAngle;
+
+        // Normalize error to [-PI, PI]
+        while (headingError > Math.PI) headingError -= 2 * Math.PI;
+        while (headingError < -Math.PI) headingError += 2 * Math.PI;
+
+        // Check if aligned within tolerance (2 degrees)
+        double tolerance = Math.toRadians(2);
+
+        if (Math.abs(headingError) < tolerance) {
+            // Aligned! Stop turning
+            isAligned = true;
+            return true;
+        } else {
+            // Not aligned, command follower to turn to target angle
+            Pose currentPose = follower.getPose();
+            Pose targetPose = new Pose(currentPose.getX(), currentPose.getY(), targetAngle);
+            follower.setPose(targetPose);
+
+            isAligned = false;
+            return false;
         }
     }
 
@@ -244,16 +309,26 @@ public class test_auto extends OpMode {
 
             case 1: // State 1: Wait until we arrive at scoring position
                 if(!follower.isBusy()) {  // Check if path following is complete
-                    Shooting(true);       // Start shooting preloads
-                    setPathState(2);      // Move to shooting wait state
+                    needsAlignment = true;  // Flag that we need to align
+                    alignmentTimer.resetTimer();  // Start alignment timer
+                    setPathState(2);  // Move to alignment state
                 }
                 break;
 
-            case 2: // State 2: Wait for all 3 preloads to be shot
+            case 2: // State 2: Align to goal using AprilTags
+                if (alignToGoal() || alignmentTimer.getElapsedTimeSeconds() > 2.0) {
+                    // Either aligned or timeout (2 seconds max for alignment)
+                    needsAlignment = false;
+                    Shooting(true);  // Start shooting preloads
+                    setPathState(3);  // Move to shooting wait state
+                }
+                break;
+
+            case 3: // State 3: Wait for all 3 preloads to be shot
                 if(shotsFired >= 3) {     // Check if we've fired all 3 shots
                     Shooting(false);      // Stop shooting
                     follower.followPath(grabPickup1);  // Drive to first pickup location
-                    setPathState(3);      // Move to pickup wait state
+                    setPathState(4);      // Move to pickup wait state
                 }
                 break;
 
@@ -261,25 +336,34 @@ public class test_auto extends OpMode {
             // PICKUP 1 CYCLE (First set of collected game elements)
             // ============================================
 
-            case 3: // State 3: Wait until we arrive at first pickup location
+            case 4: // State 4: Wait until we arrive at first pickup location
                 if(!follower.isBusy()) {
                     follower.followPath(scorePickup1, true);  // Drive back to scoring position
-                    setPathState(4);      // Move to return travel state
+                    setPathState(5);      // Move to return travel state
                 }
                 break;
 
-            case 4: // State 4: Wait until we return to scoring position
+            case 5: // State 5: Wait until we return to scoring position
                 if(!follower.isBusy()) {
-                    Shooting(true);       // Start shooting collected game elements
-                    setPathState(5);      // Move to shooting wait state
+                    needsAlignment = true;
+                    alignmentTimer.resetTimer();
+                    setPathState(6);  // Move to alignment state
                 }
                 break;
 
-            case 5: // State 5: Wait for all 3 collected elements to be shot
+            case 6: // State 6: Align to goal
+                if (alignToGoal() || alignmentTimer.getElapsedTimeSeconds() > 2.0) {
+                    needsAlignment = false;
+                    Shooting(true);       // Start shooting collected game elements
+                    setPathState(7);      // Move to shooting wait state
+                }
+                break;
+
+            case 7: // State 7: Wait for all 3 collected elements to be shot
                 if(shotsFired >= 3) {
                     Shooting(false);      // Stop shooting
                     follower.followPath(grabPickup2);  // Drive to second pickup location
-                    setPathState(6);      // Move to next pickup cycle
+                    setPathState(8);      // Move to next pickup cycle
                 }
                 break;
 
@@ -287,25 +371,34 @@ public class test_auto extends OpMode {
             // PICKUP 2 CYCLE (Second set of collected game elements)
             // ============================================
 
-            case 6: // State 6: Wait until we arrive at second pickup location
+            case 8: // State 8: Wait until we arrive at second pickup location
                 if(!follower.isBusy()) {
                     follower.followPath(scorePickup2, true);  // Drive back to scoring position
-                    setPathState(7);      // Move to return travel state
+                    setPathState(9);      // Move to return travel state
                 }
                 break;
 
-            case 7: // State 7: Wait until we return to scoring position
+            case 9: // State 9: Wait until we return to scoring position
                 if(!follower.isBusy()) {
-                    Shooting(true);       // Start shooting collected game elements
-                    setPathState(8);      // Move to shooting wait state
+                    needsAlignment = true;
+                    alignmentTimer.resetTimer();
+                    setPathState(10);  // Move to alignment state
                 }
                 break;
 
-            case 8: // State 8: Wait for all 3 collected elements to be shot
+            case 10: // State 10: Align to goal
+                if (alignToGoal() || alignmentTimer.getElapsedTimeSeconds() > 2.0) {
+                    needsAlignment = false;
+                    Shooting(true);       // Start shooting collected game elements
+                    setPathState(11);     // Move to shooting wait state
+                }
+                break;
+
+            case 11: // State 11: Wait for all 3 collected elements to be shot
                 if(shotsFired >= 3) {
                     Shooting(false);      // Stop shooting
                     follower.followPath(grabPickup3);  // Drive to third pickup location
-                    setPathState(9);      // Move to final pickup cycle
+                    setPathState(12);     // Move to final pickup cycle
                 }
                 break;
 
@@ -313,21 +406,30 @@ public class test_auto extends OpMode {
             // PICKUP 3 CYCLE (Third/final set of collected game elements)
             // ============================================
 
-            case 9: // State 9: Wait until we arrive at third pickup location
+            case 12: // State 12: Wait until we arrive at third pickup location
                 if(!follower.isBusy()) {
                     follower.followPath(scorePickup3, true);  // Drive back to scoring position
-                    setPathState(10);     // Move to return travel state
+                    setPathState(13);     // Move to return travel state
                 }
                 break;
 
-            case 10: // State 10: Wait until we return to scoring position
+            case 13: // State 13: Wait until we return to scoring position
                 if(!follower.isBusy()) {
-                    Shooting(true);       // Start shooting final collected elements
-                    setPathState(11);     // Move to final shooting wait state
+                    needsAlignment = true;
+                    alignmentTimer.resetTimer();
+                    setPathState(14);  // Move to alignment state
                 }
                 break;
 
-            case 11: // State 11: Wait for all 3 final elements to be shot
+            case 14: // State 14: Align to goal
+                if (alignToGoal() || alignmentTimer.getElapsedTimeSeconds() > 2.0) {
+                    needsAlignment = false;
+                    Shooting(true);       // Start shooting final collected elements
+                    setPathState(15);     // Move to final shooting wait state
+                }
+                break;
+
+            case 15: // State 15: Wait for all 3 final elements to be shot
                 if(shotsFired >= 3) {
                     Shooting(false);      // Stop shooting
                     setPathState(-1);     // Move to completion state
@@ -497,8 +599,8 @@ public class test_auto extends OpMode {
         // Update autonomous state machine
         autonomousPathUpdate();
 
-        // Periodically localize using AprilTags (every 0.5 seconds to avoid overhead)
-        if (localizationTimer.getElapsedTimeSeconds() > 0.5) {
+        // Periodically localize using AprilTags when not actively aligning
+        if (!needsAlignment && localizationTimer.getElapsedTimeSeconds() > 0.5) {
             localizeViaAprilTag();
             localizationTimer.resetTimer();
         }
@@ -515,6 +617,7 @@ public class test_auto extends OpMode {
         telemetry.addData("Robot X", String.format("%.2f", follower.getPose().getX()));  // X position
         telemetry.addData("Robot Y", String.format("%.2f", follower.getPose().getY()));  // Y position
         telemetry.addData("Robot Heading", String.format("%.2f°", Math.toDegrees(follower.getPose().getHeading())));  // Orientation
+        telemetry.addData("Aligned to Goal", isAligned);  // Alignment status
         telemetry.addData("Shots Fired", shotsFired + "/3");  // Shooting progress
         telemetry.addData("Shooting Active", shootingIsOn);  // Shooting system status
         telemetry.addData("Flicker Reloading", flickerReloading);  // Flicker servo status
@@ -535,6 +638,7 @@ public class test_auto extends OpMode {
         opmodeTimer = new Timer();
         shootTimer = new Timer();
         localizationTimer = new Timer();
+        alignmentTimer = new Timer();
 
         opmodeTimer.resetTimer();  // Start overall timer
         localizationTimer.resetTimer();  // Start localization timer

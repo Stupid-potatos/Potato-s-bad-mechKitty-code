@@ -85,7 +85,6 @@ public class Potato_TeleOp extends OpMode {
     // Mechanism states
     private boolean shootingIsOn = false;
     private boolean intakeIsOn = false;
-    private boolean outtakeIsOn = false;
 
     // Flicker control
     private ElapsedTime flickerTimer = new ElapsedTime();
@@ -107,7 +106,7 @@ public class Potato_TeleOp extends OpMode {
                 ? (next_to_goal ? Config.BLUE_NEAR_GOAL_START : Config.BLUE_FAR_START)
                 : (next_to_goal ? Config.RED_NEAR_GOAL_START : Config.RED_FAR_START);
 
-        follower.setStartingPose(startingPose);
+
         initializeTelemetry();
         initializeHardware();
         configureBulkReading();
@@ -115,7 +114,7 @@ public class Potato_TeleOp extends OpMode {
         configurePIDFCoefficients();
         initializeSensors();
         setInitialPositions();
-
+        follower.setStartingPose(startingPose);
         telemetry.addLine("Robot initialized - Ready to go!");
         telemetry.update();
     }
@@ -311,18 +310,6 @@ public class Potato_TeleOp extends OpMode {
                 : new double[]{Config.RED_GOAL_X, Config.RED_GOAL_Y};
     }
     private void turnToGoal(){
-        if (gamepad1.left_trigger > 0.13 && !follower.isBusy()) {
-            follower.turnTo(findIdealGoalAngle());
-            double hoodAngle = CalculateHoodAngle(findHypotenuseFromGoal()) / Config.MAX_HOOD_ANGLE; // COULD remove max_hood_angle.
-            hood.setPosition(hoodAngle);
-            telemetry.addLine("Distance: "+ findHypotenuseFromGoal());
-            telemetry.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
-            telemetry.update();
-        }
-        follower.update();
-    }
-    /* this ver will most likely work
-    private void turnToGoal(){
         if (gamepad1.left_trigger > 0.13) {
             double targetHeading = findIdealGoalAngle();
 
@@ -348,7 +335,7 @@ public class Potato_TeleOp extends OpMode {
             telemetry.addLine("Theoretical hood angle " + CalculateHoodAngle(findHypotenuseFromGoal()));
         }
     }
-     */
+
     public double findIdealGoalAngle() {
         double[] goal = getGoalPosition();
         return Math.atan2(goal[1] - follower.getPose().getY(),
@@ -431,7 +418,6 @@ public class Potato_TeleOp extends OpMode {
         telemetry.addLine("Shooting: " + (shootingIsOn ? "ON" : "OFF"));
         telemetry.addLine("FlyWheel Speed: " + Config.SHOOTINGSPEEDCURRENT);
         telemetry.addLine("Intake: " + (intakeIsOn ? "ON" : "OFF"));
-        telemetry.addLine("Outtake: " + (outtakeIsOn ? "ON" : "OFF"));
         telemetry.addLine("Flicker: " + (flickerReloading ? "RELOADING" : "READY"));
         telemetry.addLine("Hood: " + String.format("%.3f", hood.getPosition()));
         telemetry.addLine("Zone: " + zoneName + " (" + speedZone + ")");
